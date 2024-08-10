@@ -142,7 +142,7 @@ if vae_path is not None:
 if transformer.config.in_channels != vae.config.latent_channels:
     clip_image_encoder = CLIPVisionModelWithProjection.from_pretrained(
         model_name, subfolder="image_encoder"
-    ).to(device, weight_dtype)
+    ).to("cuda", weight_dtype)
     clip_image_processor = CLIPImageProcessor.from_pretrained(
         model_name, subfolder="image_encoder"
     )
@@ -200,11 +200,11 @@ else:
             torch_dtype=weight_dtype,
         )
 if low_gpu_memory_mode:
-    pipeline.enable_sequential_cpu_offload(device=device)
+    pipeline.enable_sequential_cpu_offload()
 else:
-    pipeline.enable_model_cpu_offload(device=device)
+    pipeline.enable_model_cpu_offload()
 
-generator = torch.Generator(device="cpu").manual_seed(seed)
+generator = torch.Generator(device="cuda").manual_seed(seed)
 
 if lora_path is not None:
     pipeline = merge_lora(pipeline, lora_path, lora_weight)
