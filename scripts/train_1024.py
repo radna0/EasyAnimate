@@ -73,8 +73,8 @@ for project_root in project_roots:
     sys.path.insert(0, project_root) if project_root not in sys.path else None
 
 from easyanimate.data.bucket_sampler import (
-    ASPECT_RATIO_512,
-    ASPECT_RATIO_RANDOM_CROP_512,
+    ASPECT_RATIO_1024,
+    ASPECT_RATIO_RANDOM_CROP_1024,
     ASPECT_RATIO_RANDOM_CROP_PROB,
     AspectRatioBatchImageSampler,
     AspectRatioBatchImageVideoSampler,
@@ -866,19 +866,19 @@ def parse_args():
     parser.add_argument(
         "--token_sample_size",
         type=int,
-        default=512,
+        default=1024,
         help="Sample size of the token.",
     )
     parser.add_argument(
         "--video_sample_size",
         type=int,
-        default=512,
+        default=1024,
         help="Sample size of the video.",
     )
     parser.add_argument(
         "--image_sample_size",
         type=int,
-        default=512,
+        default=1024,
         help="Sample size of the video.",
     )
     parser.add_argument(
@@ -1438,15 +1438,15 @@ def main():
 
     if args.enable_bucket:
         aspect_ratio_sample_size = {
-            key: [x / 512 * args.video_sample_size for x in ASPECT_RATIO_512[key]]
-            for key in ASPECT_RATIO_512.keys()
+            key: [x / 1024 * args.video_sample_size for x in ASPECT_RATIO_1024[key]]
+            for key in ASPECT_RATIO_1024.keys()
         }
         aspect_ratio_random_crop_sample_size = {
             key: [
-                x / 512 * args.video_sample_size
-                for x in ASPECT_RATIO_RANDOM_CROP_512[key]
+                x / 1024 * args.video_sample_size
+                for x in ASPECT_RATIO_RANDOM_CROP_1024[key]
             ]
-            for key in ASPECT_RATIO_RANDOM_CROP_512.keys()
+            for key in ASPECT_RATIO_RANDOM_CROP_1024.keys()
         }
 
         batch_sampler_generator = torch.Generator().manual_seed(args.seed)
@@ -1531,17 +1531,17 @@ def main():
 
                 aspect_ratio_sample_size = {
                     key: [
-                        x / 512 * args.image_sample_size / random_downsample_ratio
-                        for x in ASPECT_RATIO_512[key]
+                        x / 1024 * args.image_sample_size / random_downsample_ratio
+                        for x in ASPECT_RATIO_1024[key]
                     ]
-                    for key in ASPECT_RATIO_512.keys()
+                    for key in ASPECT_RATIO_1024.keys()
                 }
                 aspect_ratio_random_crop_sample_size = {
                     key: [
-                        x / 512 * args.image_sample_size / random_downsample_ratio
-                        for x in ASPECT_RATIO_RANDOM_CROP_512[key]
+                        x / 1024 * args.image_sample_size / random_downsample_ratio
+                        for x in ASPECT_RATIO_RANDOM_CROP_1024[key]
                     ]
-                    for key in ASPECT_RATIO_RANDOM_CROP_512.keys()
+                    for key in ASPECT_RATIO_RANDOM_CROP_1024.keys()
                 }
 
                 batch_video_length = (
@@ -1597,17 +1597,17 @@ def main():
 
                 aspect_ratio_sample_size = {
                     key: [
-                        x / 512 * args.video_sample_size / random_downsample_ratio
-                        for x in ASPECT_RATIO_512[key]
+                        x / 1024 * args.video_sample_size / random_downsample_ratio
+                        for x in ASPECT_RATIO_1024[key]
                     ]
-                    for key in ASPECT_RATIO_512.keys()
+                    for key in ASPECT_RATIO_1024.keys()
                 }
                 aspect_ratio_random_crop_sample_size = {
                     key: [
-                        x / 512 * args.video_sample_size / random_downsample_ratio
-                        for x in ASPECT_RATIO_RANDOM_CROP_512[key]
+                        x / 1024 * args.video_sample_size / random_downsample_ratio
+                        for x in ASPECT_RATIO_RANDOM_CROP_1024[key]
                     ]
-                    for key in ASPECT_RATIO_RANDOM_CROP_512.keys()
+                    for key in ASPECT_RATIO_RANDOM_CROP_1024.keys()
                 }
 
             closest_size, closest_ratio = get_closest_ratio(
@@ -2495,7 +2495,7 @@ def main():
                         // accelerator.unwrap_model(transformer3d).config.patch_size
                     )
                     base_size = (
-                        512
+                        1024
                         // 8
                         // accelerator.unwrap_model(transformer3d).config.patch_size
                     )

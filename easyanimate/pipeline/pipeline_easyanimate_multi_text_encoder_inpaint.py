@@ -31,20 +31,33 @@ from diffusers.models import AutoencoderKL, HunyuanDiT2DModel
 from diffusers.models.embeddings import get_2d_rotary_pos_embed
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from diffusers.pipelines.stable_diffusion.safety_checker import \
-    StableDiffusionSafetyChecker
+from diffusers.pipelines.stable_diffusion.safety_checker import (
+    StableDiffusionSafetyChecker,
+)
 from diffusers.schedulers import DDPMScheduler, DPMSolverMultistepScheduler
-from diffusers.utils import (BACKENDS_MAPPING, BaseOutput, deprecate,
-                             is_bs4_available, is_ftfy_available,
-                             is_torch_xla_available, logging,
-                             replace_example_docstring)
+from diffusers.utils import (
+    BACKENDS_MAPPING,
+    BaseOutput,
+    deprecate,
+    is_bs4_available,
+    is_ftfy_available,
+    is_torch_xla_available,
+    logging,
+    replace_example_docstring,
+)
 from diffusers.utils.torch_utils import randn_tensor
 from einops import rearrange
 from PIL import Image
 from tqdm import tqdm
-from transformers import (BertModel, BertTokenizer, CLIPImageProcessor,
-                          CLIPVisionModelWithProjection, MT5Tokenizer,
-                          T5EncoderModel, T5Tokenizer)
+from transformers import (
+    BertModel,
+    BertTokenizer,
+    CLIPImageProcessor,
+    CLIPVisionModelWithProjection,
+    MT5Tokenizer,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
 from .pipeline_easyanimate import EasyAnimatePipelineOutput
 
@@ -108,7 +121,9 @@ SUPPORTED_SHAPE = [
 def map_to_standard_shapes(target_width, target_height):
     target_ratio = target_width / target_height
     closest_ratio_idx = np.argmin(np.abs(STANDARD_RATIO - target_ratio))
-    closest_area_idx = np.argmin(np.abs(STANDARD_AREA[closest_ratio_idx] - target_width * target_height))
+    closest_area_idx = np.argmin(
+        np.abs(STANDARD_AREA[closest_ratio_idx] - target_width * target_height)
+    )
     width, height = STANDARD_SHAPE[closest_ratio_idx][closest_area_idx]
     return width, height
 
@@ -139,12 +154,16 @@ def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
     Rescale `noise_cfg` according to `guidance_rescale`. Based on findings of [Common Diffusion Noise Schedules and
     Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf). See Section 3.4
     """
-    std_text = noise_pred_text.std(dim=list(range(1, noise_pred_text.ndim)), keepdim=True)
+    std_text = noise_pred_text.std(
+        dim=list(range(1, noise_pred_text.ndim)), keepdim=True
+    )
     std_cfg = noise_cfg.std(dim=list(range(1, noise_cfg.ndim)), keepdim=True)
     # rescale the results from guidance (fixes overexposure)
     noise_pred_rescaled = noise_cfg * (std_text / std_cfg)
     # mix with the original results from guidance by factor guidance_rescale to avoid "plain looking" images
-    noise_cfg = guidance_rescale * noise_pred_rescaled + (1 - guidance_rescale) * noise_cfg
+    noise_cfg = (
+        guidance_rescale * noise_pred_rescaled + (1 - guidance_rescale) * noise_cfg
+    )
     return noise_cfg
 
 
@@ -177,7 +196,9 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             A scheduler to be used in combination with HunyuanDiT to denoise the encoded image latents.
     """
 
-    model_cpu_offload_seq = "text_encoder->text_encoder_2->clip_image_encoder->transformer->vae"
+    model_cpu_offload_seq = (
+        "text_encoder->text_encoder_2->clip_image_encoder->transformer->vae"
+    )
     _optional_components = [
         "safety_checker",
         "feature_extractor",
@@ -208,8 +229,8 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         requires_safety_checker: bool = True,
         text_encoder_2=T5EncoderModel,
         tokenizer_2=MT5Tokenizer,
-        clip_image_processor:CLIPImageProcessor = None,
-        clip_image_encoder:CLIPVisionModelWithProjection = None,
+        clip_image_processor: CLIPImageProcessor = None,
+        clip_image_encoder: CLIPVisionModelWithProjection = None,
     ):
         super().__init__()
 
@@ -223,7 +244,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
             text_encoder_2=text_encoder_2,
-            clip_image_processor=clip_image_processor, 
+            clip_image_processor=clip_image_processor,
             clip_image_encoder=clip_image_encoder,
         )
 
@@ -248,17 +269,28 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         self.register_to_config(requires_safety_checker=requires_safety_checker)
         self.default_sample_size = self.transformer.config.sample_size
         self.mask_processor = VaeImageProcessor(
-            vae_scale_factor=self.vae_scale_factor, do_normalize=False, do_binarize=True, do_convert_grayscale=True
+            vae_scale_factor=self.vae_scale_factor,
+            do_normalize=False,
+            do_binarize=True,
+            do_convert_grayscale=True,
         )
         self.model_cpu_offload_flag = False
 
     def enable_sequential_cpu_offload(self, *args, **kwargs):
         super().enable_sequential_cpu_offload(*args, **kwargs)
         self.model_cpu_offload_flag = False
-        if hasattr(self.transformer, "clip_projection") and self.transformer.clip_projection is not None:
+        if (
+            hasattr(self.transformer, "clip_projection")
+            and self.transformer.clip_projection is not None
+        ):
             import accelerate
-            accelerate.hooks.remove_hook_from_module(self.transformer.clip_projection, recurse=True)
-            self.transformer.clip_projection = self.transformer.clip_projection.to("cuda")
+
+            accelerate.hooks.remove_hook_from_module(
+                self.transformer.clip_projection, recurse=True
+            )
+            self.transformer.clip_projection = self.transformer.clip_projection.to(
+                "xla"
+            )
 
     def enable_model_cpu_offload(self, *args, **kwargs):
         super().enable_model_cpu_offload(*args, **kwargs)
@@ -313,11 +345,14 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             text_encoder_index (`int`, *optional*):
                 Index of the text encoder to use. `0` for clip and `1` for T5.
         """
+
         tokenizers = [self.tokenizer, self.tokenizer_2]
         text_encoders = [self.text_encoder, self.text_encoder_2]
 
         tokenizer = tokenizers[text_encoder_index]
         text_encoder = text_encoders[text_encoder_index]
+
+        text_encoder.to(device)
 
         if max_sequence_length is None:
             if text_encoder_index == 0:
@@ -345,7 +380,10 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             )
             text_input_ids = text_inputs.input_ids
             if text_input_ids.shape[-1] > actual_max_sequence_length:
-                reprompt = tokenizer.batch_decode(text_input_ids[:, :actual_max_sequence_length], skip_special_tokens=True)
+                reprompt = tokenizer.batch_decode(
+                    text_input_ids[:, :actual_max_sequence_length],
+                    skip_special_tokens=True,
+                )
                 text_inputs = tokenizer(
                     reprompt,
                     padding="max_length",
@@ -355,31 +393,42 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     return_tensors="pt",
                 )
                 text_input_ids = text_inputs.input_ids
-            untruncated_ids = tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
+            untruncated_ids = tokenizer(
+                prompt, padding="longest", return_tensors="pt"
+            ).input_ids
 
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
-                text_input_ids, untruncated_ids
-            ):
-                _actual_max_sequence_length = min(tokenizer.model_max_length, actual_max_sequence_length)
-                removed_text = tokenizer.batch_decode(untruncated_ids[:, _actual_max_sequence_length - 1 : -1])
+            if untruncated_ids.shape[-1] >= text_input_ids.shape[
+                -1
+            ] and not torch.equal(text_input_ids, untruncated_ids):
+                _actual_max_sequence_length = min(
+                    tokenizer.model_max_length, actual_max_sequence_length
+                )
+                removed_text = tokenizer.batch_decode(
+                    untruncated_ids[:, _actual_max_sequence_length - 1 : -1]
+                )
                 logger.warning(
                     "The following part of your input was truncated because CLIP can only handle sequences up to"
                     f" {_actual_max_sequence_length} tokens: {removed_text}"
                 )
             prompt_attention_mask = text_inputs.attention_mask.to(device)
+
             prompt_embeds = text_encoder(
                 text_input_ids.to(device),
                 attention_mask=prompt_attention_mask,
             )
             prompt_embeds = prompt_embeds[0]
-            prompt_attention_mask = prompt_attention_mask.repeat(num_images_per_prompt, 1)
+            prompt_attention_mask = prompt_attention_mask.repeat(
+                num_images_per_prompt, 1
+            )
 
         prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        prompt_embeds = prompt_embeds.view(bs_embed * num_images_per_prompt, seq_len, -1)
+        prompt_embeds = prompt_embeds.view(
+            bs_embed * num_images_per_prompt, seq_len, -1
+        )
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
@@ -412,7 +461,10 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             )
             uncond_input_ids = uncond_input.input_ids
             if uncond_input_ids.shape[-1] > actual_max_sequence_length:
-                reuncond_tokens = tokenizer.batch_decode(uncond_input_ids[:, :actual_max_sequence_length], skip_special_tokens=True)
+                reuncond_tokens = tokenizer.batch_decode(
+                    uncond_input_ids[:, :actual_max_sequence_length],
+                    skip_special_tokens=True,
+                )
                 uncond_input = tokenizer(
                     reuncond_tokens,
                     padding="max_length",
@@ -429,18 +481,31 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 attention_mask=negative_prompt_attention_mask,
             )
             negative_prompt_embeds = negative_prompt_embeds[0]
-            negative_prompt_attention_mask = negative_prompt_attention_mask.repeat(num_images_per_prompt, 1)
+            negative_prompt_attention_mask = negative_prompt_attention_mask.repeat(
+                num_images_per_prompt, 1
+            )
 
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
 
-            negative_prompt_embeds = negative_prompt_embeds.to(dtype=dtype, device=device)
+            negative_prompt_embeds = negative_prompt_embeds.to(
+                dtype=dtype, device=device
+            )
 
-            negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-            negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+            negative_prompt_embeds = negative_prompt_embeds.repeat(
+                1, num_images_per_prompt, 1
+            )
+            negative_prompt_embeds = negative_prompt_embeds.view(
+                batch_size * num_images_per_prompt, seq_len, -1
+            )
 
-        return prompt_embeds, negative_prompt_embeds, prompt_attention_mask, negative_prompt_attention_mask
+        return (
+            prompt_embeds,
+            negative_prompt_embeds,
+            prompt_attention_mask,
+            negative_prompt_attention_mask,
+        )
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, device, dtype):
@@ -448,10 +513,14 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             has_nsfw_concept = None
         else:
             if torch.is_tensor(image):
-                feature_extractor_input = self.image_processor.postprocess(image, output_type="pil")
+                feature_extractor_input = self.image_processor.postprocess(
+                    image, output_type="pil"
+                )
             else:
                 feature_extractor_input = self.image_processor.numpy_to_pil(image)
-            safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="pt").to(device)
+            safety_checker_input = self.feature_extractor(
+                feature_extractor_input, return_tensors="pt"
+            ).to(device)
             image, has_nsfw_concept = self.safety_checker(
                 images=image, clip_input=safety_checker_input.pixel_values.to(dtype)
             )
@@ -464,13 +533,17 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
 
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(
+            inspect.signature(self.scheduler.step).parameters.keys()
+        )
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         # check if the scheduler accepts generator
-        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_generator = "generator" in set(
+            inspect.signature(self.scheduler.step).parameters.keys()
+        )
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
@@ -492,10 +565,13 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         callback_on_step_end_tensor_inputs=None,
     ):
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+            raise ValueError(
+                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
+            )
 
         if callback_on_step_end_tensor_inputs is not None and not all(
-            k in self._callback_tensor_inputs for k in callback_on_step_end_tensor_inputs
+            k in self._callback_tensor_inputs
+            for k in callback_on_step_end_tensor_inputs
         ):
             raise ValueError(
                 f"`callback_on_step_end_tensor_inputs` has to be in {self._callback_tensor_inputs}, but found {[k for k in callback_on_step_end_tensor_inputs if k not in self._callback_tensor_inputs]}"
@@ -514,14 +590,22 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             raise ValueError(
                 "Provide either `prompt` or `prompt_embeds_2`. Cannot leave both `prompt` and `prompt_embeds_2` undefined."
             )
-        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
-            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+        elif prompt is not None and (
+            not isinstance(prompt, str) and not isinstance(prompt, list)
+        ):
+            raise ValueError(
+                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
+            )
 
         if prompt_embeds is not None and prompt_attention_mask is None:
-            raise ValueError("Must provide `prompt_attention_mask` when specifying `prompt_embeds`.")
+            raise ValueError(
+                "Must provide `prompt_attention_mask` when specifying `prompt_embeds`."
+            )
 
         if prompt_embeds_2 is not None and prompt_attention_mask_2 is None:
-            raise ValueError("Must provide `prompt_attention_mask_2` when specifying `prompt_embeds_2`.")
+            raise ValueError(
+                "Must provide `prompt_attention_mask_2` when specifying `prompt_embeds_2`."
+            )
 
         if negative_prompt is not None and negative_prompt_embeds is not None:
             raise ValueError(
@@ -529,10 +613,18 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
             )
 
-        if negative_prompt_embeds is not None and negative_prompt_attention_mask is None:
-            raise ValueError("Must provide `negative_prompt_attention_mask` when specifying `negative_prompt_embeds`.")
+        if (
+            negative_prompt_embeds is not None
+            and negative_prompt_attention_mask is None
+        ):
+            raise ValueError(
+                "Must provide `negative_prompt_attention_mask` when specifying `negative_prompt_embeds`."
+            )
 
-        if negative_prompt_embeds_2 is not None and negative_prompt_attention_mask_2 is None:
+        if (
+            negative_prompt_embeds_2 is not None
+            and negative_prompt_attention_mask_2 is None
+        ):
             raise ValueError(
                 "Must provide `negative_prompt_attention_mask_2` when specifying `negative_prompt_embeds_2`."
             )
@@ -562,7 +654,16 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         return timesteps, num_inference_steps - t_start
 
     def prepare_mask_latents(
-        self, mask, masked_image, batch_size, height, width, dtype, device, generator, do_classifier_free_guidance
+        self,
+        mask,
+        masked_image,
+        batch_size,
+        height,
+        width,
+        dtype,
+        device,
+        generator,
+        do_classifier_free_guidance,
     ):
         # resize the mask to latents shape as we concatenate the mask to the latents
         # we do that before converting to dtype to avoid breaking in case we're using cpu_offload
@@ -570,7 +671,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         video_length = mask.shape[2]
 
         mask = mask.to(device=device, dtype=self.vae.dtype)
-        if self.vae.quant_conv.weight.ndim==5:
+        if self.vae.quant_conv.weight.ndim == 5:
             bs = 1
             mini_batch_encoder = self.vae.mini_batch_encoder
             new_mask = []
@@ -579,7 +680,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 mask_bs = self.vae.encode(mask_bs)[0]
                 mask_bs = mask_bs.sample()
                 new_mask.append(mask_bs)
-            mask = torch.cat(new_mask, dim = 0)
+            mask = torch.cat(new_mask, dim=0)
             mask = mask * self.vae.config.scaling_factor
 
         else:
@@ -592,7 +693,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 mask = rearrange(mask, "(b f) c h w -> b c f h w", f=video_length)
 
         masked_image = masked_image.to(device=device, dtype=self.vae.dtype)
-        if self.vae.quant_conv.weight.ndim==5:
+        if self.vae.quant_conv.weight.ndim == 5:
             bs = 1
             new_mask_pixel_values = []
             for i in range(0, masked_image.shape[0], bs):
@@ -600,7 +701,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 mask_pixel_values_bs = self.vae.encode(mask_pixel_values_bs)[0]
                 mask_pixel_values_bs = mask_pixel_values_bs.sample()
                 new_mask_pixel_values.append(mask_pixel_values_bs)
-            masked_image_latents = torch.cat(new_mask_pixel_values, dim = 0)
+            masked_image_latents = torch.cat(new_mask_pixel_values, dim=0)
             masked_image_latents = masked_image_latents * self.vae.config.scaling_factor
 
         else:
@@ -609,8 +710,12 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             else:
                 video_length = mask.shape[2]
                 masked_image = rearrange(masked_image, "b c f h w -> (b f) c h w")
-                masked_image_latents = self._encode_vae_image(masked_image, generator=generator)
-                masked_image_latents = rearrange(masked_image_latents, "(b f) c h w -> b c f h w", f=video_length)
+                masked_image_latents = self._encode_vae_image(
+                    masked_image, generator=generator
+                )
+                masked_image_latents = rearrange(
+                    masked_image_latents, "(b f) c h w -> b c f h w", f=video_length
+                )
 
         # aligning device to prevent device errors when concating it with the latent model input
         masked_image_latents = masked_image_latents.to(device=device, dtype=dtype)
@@ -618,7 +723,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         return mask, masked_image_latents
 
     def prepare_latents(
-        self, 
+        self,
         batch_size,
         num_channels_latents,
         height,
@@ -634,12 +739,28 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         return_noise=False,
         return_video_latents=False,
     ):
-        if self.vae.quant_conv.weight.ndim==5:
+        if self.vae.quant_conv.weight.ndim == 5:
             mini_batch_encoder = self.vae.mini_batch_encoder
             mini_batch_decoder = self.vae.mini_batch_decoder
-            shape = (batch_size, num_channels_latents, int(video_length // mini_batch_encoder * mini_batch_decoder) if video_length != 1 else 1, height // self.vae_scale_factor, width // self.vae_scale_factor)
+            shape = (
+                batch_size,
+                num_channels_latents,
+                (
+                    int(video_length // mini_batch_encoder * mini_batch_decoder)
+                    if video_length != 1
+                    else 1
+                ),
+                height // self.vae_scale_factor,
+                width // self.vae_scale_factor,
+            )
         else:
-            shape = (batch_size, num_channels_latents, video_length, height // self.vae_scale_factor, width // self.vae_scale_factor)
+            shape = (
+                batch_size,
+                num_channels_latents,
+                video_length,
+                height // self.vae_scale_factor,
+                width // self.vae_scale_factor,
+            )
 
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
@@ -649,7 +770,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
         if return_video_latents or (latents is None and not is_strength_max):
             video = video.to(device=device, dtype=self.vae.dtype)
-            if self.vae.quant_conv.weight.ndim==5:
+            if self.vae.quant_conv.weight.ndim == 5:
                 bs = 1
                 new_video = []
                 for i in range(0, video.shape[0], bs):
@@ -657,7 +778,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     video_bs = self.vae.encode(video_bs)[0]
                     video_bs = video_bs.sample()
                     new_video.append(video_bs)
-                video = torch.cat(new_video, dim = 0)
+                video = torch.cat(new_video, dim=0)
                 video = video * self.vae.config.scaling_factor
 
             else:
@@ -674,9 +795,17 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         if latents is None:
             noise = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
             # if strength is 1. then initialise the latents to noise, else initial to image + noise
-            latents = noise if is_strength_max else self.scheduler.add_noise(video_latents, noise, timestep)
+            latents = (
+                noise
+                if is_strength_max
+                else self.scheduler.add_noise(video_latents, noise, timestep)
+            )
             # if pure noise then scale the initial latents by the  Scheduler's init sigma
-            latents = latents * self.scheduler.init_noise_sigma if is_strength_max else latents
+            latents = (
+                latents * self.scheduler.init_noise_sigma
+                if is_strength_max
+                else latents
+            )
         else:
             noise = latents.to(device)
             latents = noise * self.scheduler.init_noise_sigma
@@ -704,32 +833,36 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         latents = latents.mode()
         middle_video = self.vae.decode(latents)[0]
 
-        video[:, :, prefix_index_before:-prefix_index_after] = (video[:, :, prefix_index_before:-prefix_index_after] + middle_video) / 2
+        video[:, :, prefix_index_before:-prefix_index_after] = (
+            video[:, :, prefix_index_before:-prefix_index_after] + middle_video
+        ) / 2
         return video
-
 
     def decode_latents(self, latents):
         video_length = latents.shape[2]
         latents = 1 / self.vae.config.scaling_factor * latents
-        if self.vae.quant_conv.weight.ndim==5:
+        if self.vae.quant_conv.weight.ndim == 5:
             mini_batch_encoder = self.vae.mini_batch_encoder
             mini_batch_decoder = self.vae.mini_batch_decoder
             video = self.vae.decode(latents)[0]
             video = video.clamp(-1, 1)
             if not self.vae.cache_compression_vae:
-                video = self.smooth_output(video, mini_batch_encoder, mini_batch_decoder).cpu().clamp(-1, 1)
+                video = (
+                    self.smooth_output(video, mini_batch_encoder, mini_batch_decoder)
+                    .cpu()
+                    .clamp(-1, 1)
+                )
         else:
             latents = rearrange(latents, "b c f h w -> (b f) c h w")
             video = []
             for frame_idx in tqdm(range(latents.shape[0])):
-                video.append(self.vae.decode(latents[frame_idx:frame_idx+1]).sample)
+                video.append(self.vae.decode(latents[frame_idx : frame_idx + 1]).sample)
             video = torch.cat(video)
             video = rearrange(video, "(b f) c h w -> b c f h w", f=video_length)
         video = (video / 2 + 0.5).clamp(0, 1)
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
         video = video.cpu().float().numpy()
         return video
-
 
     @property
     def guidance_scale(self):
@@ -783,7 +916,11 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         output_type: Optional[str] = "latent",
         return_dict: bool = True,
         callback_on_step_end: Optional[
-            Union[Callable[[int, int, Dict], None], PipelineCallback, MultiPipelineCallbacks]
+            Union[
+                Callable[[int, int, Dict], None],
+                PipelineCallback,
+                MultiPipelineCallbacks,
+            ]
         ] = None,
         callback_on_step_end_tensor_inputs: List[str] = ["latents"],
         guidance_rescale: float = 0.0,
@@ -795,6 +932,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         clip_apply_ratio: float = 0.40,
         strength: float = 1.0,
         comfyui_progressbar: bool = False,
+        initDevice=None,
     ):
         r"""
         The call function to the pipeline for generation with HunyuanDiT.
@@ -890,7 +1028,9 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             width, height = map_to_standard_shapes(width, height)
             height = int(height)
             width = int(width)
-            logger.warning(f"Reshaped to (height, width)=({height}, {width}), Supported shapes are {SUPPORTED_SHAPE}")
+            logger.warning(
+                f"Reshaped to (height, width)=({height}, {width}), Supported shapes are {SUPPORTED_SHAPE}"
+            )
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -921,6 +1061,9 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         device = self._execution_device
+        if initDevice is not None:
+            device = initDevice
+        print("_________________Using Device:", device)
 
         # 3. Encode input prompt
 
@@ -970,6 +1113,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         )
         if comfyui_progressbar:
             from comfy.utils import ProgressBar
+
             pbar = ProgressBar(num_inference_steps + 3)
         # at which timestep to set the initial noise (n.b. 50% if strength is 0.5)
         latent_timestep = timesteps[:1].repeat(batch_size * num_images_per_prompt)
@@ -978,9 +1122,13 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
         if video is not None:
             video_length = video.shape[2]
-            init_video = self.image_processor.preprocess(rearrange(video, "b c f h w -> (b f) c h w"), height=height, width=width) 
+            init_video = self.image_processor.preprocess(
+                rearrange(video, "b c f h w -> (b f) c h w"), height=height, width=width
+            )
             init_video = init_video.to(dtype=torch.float32)
-            init_video = rearrange(init_video, "(b f) c h w -> b c f h w", f=video_length)
+            init_video = rearrange(
+                init_video, "(b f) c h w -> b c f h w", f=video_length
+            )
         else:
             init_video = None
 
@@ -1021,36 +1169,70 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
         if clip_image is not None:
             inputs = self.clip_image_processor(images=clip_image, return_tensors="pt")
-            inputs["pixel_values"] = inputs["pixel_values"].to(latents.device, dtype=latents.dtype)
-            clip_encoder_hidden_states = self.clip_image_encoder(**inputs).last_hidden_state[:, 1:]
+            inputs["pixel_values"] = inputs["pixel_values"].to(
+                latents.device, dtype=latents.dtype
+            )
+            clip_encoder_hidden_states = self.clip_image_encoder(
+                **inputs
+            ).last_hidden_state[:, 1:]
             clip_encoder_hidden_states_neg = torch.zeros(
                 [
-                    batch_size, 
-                    int(self.clip_image_encoder.config.image_size / self.clip_image_encoder.config.patch_size) ** 2, 
-                    int(self.clip_image_encoder.config.hidden_size)
+                    batch_size,
+                    int(
+                        self.clip_image_encoder.config.image_size
+                        / self.clip_image_encoder.config.patch_size
+                    )
+                    ** 2,
+                    int(self.clip_image_encoder.config.hidden_size),
                 ]
             ).to(latents.device, dtype=latents.dtype)
 
-            clip_attention_mask = torch.ones([batch_size, self.transformer.n_query]).to(latents.device, dtype=latents.dtype)
-            clip_attention_mask_neg = torch.zeros([batch_size, self.transformer.n_query]).to(latents.device, dtype=latents.dtype)
+            clip_attention_mask = torch.ones([batch_size, self.transformer.n_query]).to(
+                latents.device, dtype=latents.dtype
+            )
+            clip_attention_mask_neg = torch.zeros(
+                [batch_size, self.transformer.n_query]
+            ).to(latents.device, dtype=latents.dtype)
 
-            clip_encoder_hidden_states_input = torch.cat([clip_encoder_hidden_states_neg, clip_encoder_hidden_states]) if self.do_classifier_free_guidance else clip_encoder_hidden_states
-            clip_attention_mask_input = torch.cat([clip_attention_mask_neg, clip_attention_mask]) if self.do_classifier_free_guidance else clip_attention_mask
+            clip_encoder_hidden_states_input = (
+                torch.cat([clip_encoder_hidden_states_neg, clip_encoder_hidden_states])
+                if self.do_classifier_free_guidance
+                else clip_encoder_hidden_states
+            )
+            clip_attention_mask_input = (
+                torch.cat([clip_attention_mask_neg, clip_attention_mask])
+                if self.do_classifier_free_guidance
+                else clip_attention_mask
+            )
 
         elif clip_image is None and num_channels_transformer != num_channels_latents:
             clip_encoder_hidden_states = torch.zeros(
                 [
-                    batch_size, 
-                    int(self.clip_image_encoder.config.image_size / self.clip_image_encoder.config.patch_size) ** 2, 
-                    int(self.clip_image_encoder.config.hidden_size)
+                    batch_size,
+                    int(
+                        self.clip_image_encoder.config.image_size
+                        / self.clip_image_encoder.config.patch_size
+                    )
+                    ** 2,
+                    int(self.clip_image_encoder.config.hidden_size),
                 ]
             ).to(latents.device, dtype=latents.dtype)
 
             clip_attention_mask = torch.zeros([batch_size, self.transformer.n_query])
-            clip_attention_mask = clip_attention_mask.to(latents.device, dtype=latents.dtype)
+            clip_attention_mask = clip_attention_mask.to(
+                latents.device, dtype=latents.dtype
+            )
 
-            clip_encoder_hidden_states_input = torch.cat([clip_encoder_hidden_states] * 2) if self.do_classifier_free_guidance else clip_encoder_hidden_states
-            clip_attention_mask_input = torch.cat([clip_attention_mask] * 2) if self.do_classifier_free_guidance else clip_attention_mask
+            clip_encoder_hidden_states_input = (
+                torch.cat([clip_encoder_hidden_states] * 2)
+                if self.do_classifier_free_guidance
+                else clip_encoder_hidden_states
+            )
+            clip_attention_mask_input = (
+                torch.cat([clip_attention_mask] * 2)
+                if self.do_classifier_free_guidance
+                else clip_attention_mask
+            )
 
         else:
             clip_encoder_hidden_states_input = None
@@ -1060,25 +1242,48 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
         if mask_video is not None:
             if (mask_video == 255).all():
-                mask_latents = torch.zeros_like(latents).to(latents.device, latents.dtype)
-                masked_video_latents = torch.zeros_like(latents).to(latents.device, latents.dtype)
-
-                mask_input = torch.cat([mask_latents] * 2) if self.do_classifier_free_guidance else mask_latents
-                masked_video_latents_input = (
-                    torch.cat([masked_video_latents] * 2) if self.do_classifier_free_guidance else masked_video_latents
+                mask_latents = torch.zeros_like(latents).to(
+                    latents.device, latents.dtype
                 )
-                inpaint_latents = torch.cat([mask_input, masked_video_latents_input], dim=1).to(latents.dtype)
+                masked_video_latents = torch.zeros_like(latents).to(
+                    latents.device, latents.dtype
+                )
+
+                mask_input = (
+                    torch.cat([mask_latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else mask_latents
+                )
+                masked_video_latents_input = (
+                    torch.cat([masked_video_latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else masked_video_latents
+                )
+                inpaint_latents = torch.cat(
+                    [mask_input, masked_video_latents_input], dim=1
+                ).to(latents.dtype)
             else:
                 # Prepare mask latent variables
                 video_length = video.shape[2]
-                mask_condition = self.mask_processor.preprocess(rearrange(mask_video, "b c f h w -> (b f) c h w"), height=height, width=width) 
+                mask_condition = self.mask_processor.preprocess(
+                    rearrange(mask_video, "b c f h w -> (b f) c h w"),
+                    height=height,
+                    width=width,
+                )
                 mask_condition = mask_condition.to(dtype=torch.float32)
-                mask_condition = rearrange(mask_condition, "(b f) c h w -> b c f h w", f=video_length)
-                
+                mask_condition = rearrange(
+                    mask_condition, "(b f) c h w -> b c f h w", f=video_length
+                )
+
                 if num_channels_transformer != num_channels_latents:
                     mask_condition_tile = torch.tile(mask_condition, [1, 3, 1, 1, 1])
                     if masked_video_latents is None:
-                        masked_video = init_video * (mask_condition_tile < 0.5) + torch.ones_like(init_video) * (mask_condition_tile > 0.5) * -1
+                        masked_video = (
+                            init_video * (mask_condition_tile < 0.5)
+                            + torch.ones_like(init_video)
+                            * (mask_condition_tile > 0.5)
+                            * -1
+                        )
                     else:
                         masked_video = masked_video_latents
 
@@ -1093,33 +1298,65 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                         generator,
                         self.do_classifier_free_guidance,
                     )
-                    mask = torch.tile(mask_condition, [1, num_channels_latents, 1, 1, 1])
-                    mask = F.interpolate(mask, size=latents.size()[-3:], mode='trilinear', align_corners=True).to(latents.device, latents.dtype)
-                    
-                    mask_input = torch.cat([mask_latents] * 2) if self.do_classifier_free_guidance else mask_latents
-                    masked_video_latents_input = (
-                        torch.cat([masked_video_latents] * 2) if self.do_classifier_free_guidance else masked_video_latents
+                    mask = torch.tile(
+                        mask_condition, [1, num_channels_latents, 1, 1, 1]
                     )
-                    inpaint_latents = torch.cat([mask_input, masked_video_latents_input], dim=1).to(latents.dtype)
+                    mask = F.interpolate(
+                        mask,
+                        size=latents.size()[-3:],
+                        mode="trilinear",
+                        align_corners=True,
+                    ).to(latents.device, latents.dtype)
+
+                    mask_input = (
+                        torch.cat([mask_latents] * 2)
+                        if self.do_classifier_free_guidance
+                        else mask_latents
+                    )
+                    masked_video_latents_input = (
+                        torch.cat([masked_video_latents] * 2)
+                        if self.do_classifier_free_guidance
+                        else masked_video_latents
+                    )
+                    inpaint_latents = torch.cat(
+                        [mask_input, masked_video_latents_input], dim=1
+                    ).to(latents.dtype)
                 else:
-                    mask = torch.tile(mask_condition, [1, num_channels_latents, 1, 1, 1])
-                    mask = F.interpolate(mask, size=latents.size()[-3:], mode='trilinear', align_corners=True).to(latents.device, latents.dtype)
-                    
+                    mask = torch.tile(
+                        mask_condition, [1, num_channels_latents, 1, 1, 1]
+                    )
+                    mask = F.interpolate(
+                        mask,
+                        size=latents.size()[-3:],
+                        mode="trilinear",
+                        align_corners=True,
+                    ).to(latents.device, latents.dtype)
+
                     inpaint_latents = None
         else:
             if num_channels_transformer != num_channels_latents:
                 mask = torch.zeros_like(latents).to(latents.device, latents.dtype)
-                masked_video_latents = torch.zeros_like(latents).to(latents.device, latents.dtype)
-
-                mask_input = torch.cat([mask] * 2) if self.do_classifier_free_guidance else mask
-                masked_video_latents_input = (
-                    torch.cat([masked_video_latents] * 2) if self.do_classifier_free_guidance else masked_video_latents
+                masked_video_latents = torch.zeros_like(latents).to(
+                    latents.device, latents.dtype
                 )
-                inpaint_latents = torch.cat([mask_input, masked_video_latents_input], dim=1).to(latents.dtype)
+
+                mask_input = (
+                    torch.cat([mask] * 2) if self.do_classifier_free_guidance else mask
+                )
+                masked_video_latents_input = (
+                    torch.cat([masked_video_latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else masked_video_latents
+                )
+                inpaint_latents = torch.cat(
+                    [mask_input, masked_video_latents_input], dim=1
+                ).to(latents.dtype)
             else:
                 mask = torch.zeros_like(init_video[:, :1])
                 mask = torch.tile(mask, [1, num_channels_latents, 1, 1, 1])
-                mask = F.interpolate(mask, size=latents.size()[-3:], mode='trilinear', align_corners=True).to(latents.device, latents.dtype)
+                mask = F.interpolate(
+                    mask, size=latents.size()[-3:], mode="trilinear", align_corners=True
+                ).to(latents.device, latents.dtype)
 
                 inpaint_latents = None
         if comfyui_progressbar:
@@ -1130,7 +1367,10 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             # default case for runwayml/stable-diffusion-inpainting
             num_channels_mask = mask_latents.shape[1]
             num_channels_masked_image = masked_video_latents.shape[1]
-            if num_channels_latents + num_channels_mask + num_channels_masked_image != self.transformer.config.in_channels:
+            if (
+                num_channels_latents + num_channels_mask + num_channels_masked_image
+                != self.transformer.config.in_channels
+            ):
                 raise ValueError(
                     f"Incorrect configuration settings! The config of `pipeline.transformer`: {self.transformer.config} expects"
                     f" {self.transformer.config.in_channels} but received `num_channels_latents`: {num_channels_latents} +"
@@ -1142,7 +1382,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             raise ValueError(
                 f"The transformer {self.transformer.__class__} should have 4 input channels, not {self.transformer.config.in_channels}."
             )
-        
+
         # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
@@ -1150,9 +1390,13 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         grid_height = height // 8 // self.transformer.config.patch_size
         grid_width = width // 8 // self.transformer.config.patch_size
         base_size = 512 // 8 // self.transformer.config.patch_size
-        grid_crops_coords = get_resize_crop_region_for_grid((grid_height, grid_width), base_size)
+        grid_crops_coords = get_resize_crop_region_for_grid(
+            (grid_height, grid_width), base_size
+        )
         image_rotary_emb = get_2d_rotary_pos_embed(
-            self.transformer.inner_dim // self.transformer.num_heads, grid_crops_coords, (grid_height, grid_width)
+            self.transformer.inner_dim // self.transformer.num_heads,
+            grid_crops_coords,
+            (grid_height, grid_width),
         )
 
         style = torch.tensor([0], device=device)
@@ -1163,9 +1407,13 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
         if self.do_classifier_free_guidance:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
-            prompt_attention_mask = torch.cat([negative_prompt_attention_mask, prompt_attention_mask])
+            prompt_attention_mask = torch.cat(
+                [negative_prompt_attention_mask, prompt_attention_mask]
+            )
             prompt_embeds_2 = torch.cat([negative_prompt_embeds_2, prompt_embeds_2])
-            prompt_attention_mask_2 = torch.cat([negative_prompt_attention_mask_2, prompt_attention_mask_2])
+            prompt_attention_mask_2 = torch.cat(
+                [negative_prompt_attention_mask_2, prompt_attention_mask_2]
+            )
             add_time_ids = torch.cat([add_time_ids] * 2, dim=0)
             style = torch.cat([style] * 2, dim=0)
 
@@ -1193,16 +1441,31 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     continue
 
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                latent_model_input = (
+                    torch.cat([latents] * 2)
+                    if self.do_classifier_free_guidance
+                    else latents
+                )
+                latent_model_input = self.scheduler.scale_model_input(
+                    latent_model_input, t
+                )
 
-                if i < len(timesteps) * (1 - clip_apply_ratio) and clip_encoder_hidden_states_input is not None:
-                    clip_encoder_hidden_states_actual_input = torch.zeros_like(clip_encoder_hidden_states_input)
-                    clip_attention_mask_actual_input = torch.zeros_like(clip_attention_mask_input)
+                if (
+                    i < len(timesteps) * (1 - clip_apply_ratio)
+                    and clip_encoder_hidden_states_input is not None
+                ):
+                    clip_encoder_hidden_states_actual_input = torch.zeros_like(
+                        clip_encoder_hidden_states_input
+                    )
+                    clip_attention_mask_actual_input = torch.zeros_like(
+                        clip_attention_mask_input
+                    )
                 else:
-                    clip_encoder_hidden_states_actual_input = clip_encoder_hidden_states_input
+                    clip_encoder_hidden_states_actual_input = (
+                        clip_encoder_hidden_states_input
+                    )
                     clip_attention_mask_actual_input = clip_attention_mask_input
-                
+
                 current_timestep = t
                 if not torch.is_tensor(current_timestep):
                     # TODO: this requires sync between CPU and GPU. So try to pass timesteps as tensors if you can
@@ -1212,13 +1475,19 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                         dtype = torch.float32 if is_mps else torch.float64
                     else:
                         dtype = torch.int32 if is_mps else torch.int64
-                    current_timestep = torch.tensor([current_timestep], dtype=dtype, device=latent_model_input.device)
+                    current_timestep = torch.tensor(
+                        [current_timestep],
+                        dtype=dtype,
+                        device=latent_model_input.device,
+                    )
                 elif len(current_timestep.shape) == 0:
-                    current_timestep = current_timestep[None].to(latent_model_input.device)
+                    current_timestep = current_timestep[None].to(
+                        latent_model_input.device
+                    )
                 # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
-                current_timestep = current_timestep.expand(latent_model_input.shape[0]).to(
-                    dtype=latent_model_input.dtype
-                )
+                current_timestep = current_timestep.expand(
+                    latent_model_input.shape[0]
+                ).to(dtype=latent_model_input.dtype)
 
                 # predict the noise residual
                 noise_pred = self.transformer(
@@ -1242,14 +1511,20 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                 # perform guidance
                 if self.do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
 
                 if self.do_classifier_free_guidance and guidance_rescale > 0.0:
                     # Based on 3.4. in https://arxiv.org/pdf/2305.08891.pdf
-                    noise_pred = rescale_noise_cfg(noise_pred, noise_pred_text, guidance_rescale=guidance_rescale)
+                    noise_pred = rescale_noise_cfg(
+                        noise_pred, noise_pred_text, guidance_rescale=guidance_rescale
+                    )
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+                latents = self.scheduler.step(
+                    noise_pred, t, latents, **extra_step_kwargs, return_dict=False
+                )[0]
 
                 if num_channels_transformer == 4:
                     init_latents_proper = image_latents
@@ -1259,8 +1534,10 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                         init_latents_proper = self.scheduler.add_noise(
                             init_latents_proper, noise, torch.tensor([noise_timestep])
                         )
-                    
-                    latents = (1 - init_mask) * init_latents_proper + init_mask * latents
+
+                    latents = (
+                        1 - init_mask
+                    ) * init_latents_proper + init_mask * latents
 
                 if callback_on_step_end is not None:
                     callback_kwargs = {}
@@ -1270,18 +1547,25 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
 
                     latents = callback_outputs.pop("latents", latents)
                     prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
-                    negative_prompt_embeds = callback_outputs.pop("negative_prompt_embeds", negative_prompt_embeds)
-                    prompt_embeds_2 = callback_outputs.pop("prompt_embeds_2", prompt_embeds_2)
+                    negative_prompt_embeds = callback_outputs.pop(
+                        "negative_prompt_embeds", negative_prompt_embeds
+                    )
+                    prompt_embeds_2 = callback_outputs.pop(
+                        "prompt_embeds_2", prompt_embeds_2
+                    )
                     negative_prompt_embeds_2 = callback_outputs.pop(
                         "negative_prompt_embeds_2", negative_prompt_embeds_2
                     )
 
-                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                if i == len(timesteps) - 1 or (
+                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
+                ):
                     progress_bar.update()
 
                 if XLA_AVAILABLE:
                     xm.mark_step()
 
+                print(f"Mark Step Checkpoint {i}, {t}")
                 if comfyui_progressbar:
                     pbar.update(1)
 
