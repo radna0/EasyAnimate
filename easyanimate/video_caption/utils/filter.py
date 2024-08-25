@@ -96,6 +96,9 @@ def filter(
         asethetic_score_siglip_df["aesthetic_score_siglip"] = asethetic_score_siglip_df["aesthetic_score_siglip"].apply(
             lambda x: ast.literal_eval(x) if isinstance(x, str) else x
         )
+        asethetic_score_siglip_df["aesthetic_score_siglip"].apply(
+            lambda x: print(x)
+        )
         asethetic_score_siglip_df["aesthetic_score_siglip_mean"] = asethetic_score_siglip_df["aesthetic_score_siglip"].apply(
             lambda x: sum(x) / len(x)
         )

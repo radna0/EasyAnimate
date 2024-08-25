@@ -54,6 +54,7 @@ def update_diffusion_transformer_api(_: gr.Blocks, app: FastAPI, controller):
         return {"message": comment}
 
 
+<<<<<<< HEAD
 def save_base64_video(base64_string):
     video_data = base64.b64decode(base64_string)
 
@@ -69,6 +70,8 @@ def save_base64_video(base64_string):
     return file_path
 
 
+=======
+>>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 def infer_forward_api(_: gr.Blocks, app: FastAPI, controller):
     @app.post("/easyanimate/infer_forward")
     def _infer_forward_api(
@@ -97,8 +100,11 @@ def infer_forward_api(_: gr.Blocks, app: FastAPI, controller):
         cfg_scale_slider = datas.get("cfg_scale_slider", 6)
         start_image = datas.get("start_image", None)
         end_image = datas.get("end_image", None)
+<<<<<<< HEAD
         validation_video = datas.get("validation_video", None)
         denoise_strength = datas.get("denoise_strength", 0.70)
+=======
+>>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
         seed_textbox = datas.get("seed_textbox", 43)
 
         generation_method = "Image Generation" if is_image else generation_method
