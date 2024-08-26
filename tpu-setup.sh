@@ -38,8 +38,14 @@ wget https://pai-aigc-photog.oss-cn-hangzhou.aliyuncs.com/easyanimate/Diffusion_
 
 cd models/Diffusion_Transformer/
 tar -zxvf EasyAnimateV4-XL-2-InP.tar.gz
+rm EasyAnimateV4-XL-2-InP.tar.gz
 
 cd ../../
+
+
+# Image Caption
+
+pip install lmdeploy==0.5.3
 
 # Video Caption
 pip install -r requirements.txt
@@ -51,17 +57,19 @@ cp -v easyocr_detection_patched.py $site_pkg_path/easyocr/detection.py
 
 sudo apt install -y ffmpeg   
 
+sudo pip install --upgrade accelerate
 
 # TPU all gather implementation
-cd ~/.local/lib/python3.10/site-packages/accelerate/utils/
-rm -rf operations.py
-wget -O operations.py https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/operations.py
+cd $site_pkg_path/accelerate/utils/
+sudo rm -rf operations.py
+sudo wget -O operations.py https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/operations.py
 
 #Accelerate config
 cd ~/.cache/huggingface/accelerate/
 wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/config.yaml
 
 # Pytorch XLA
+pip uninstall torch torchvision -y
 pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
 pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-nightly-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
 
