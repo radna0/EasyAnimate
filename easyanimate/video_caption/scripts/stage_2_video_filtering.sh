@@ -8,7 +8,7 @@ MOTION_SAVED_PATH="datasets/qbit-downloads_batch/data_$1/meta_motion_info.jsonl"
 
 # measure the duration to process
 export START_TIME=$(date +%s)
-python -m utils.get_meta_file \
+python3.10 -m utils.get_meta_file \
     --video_folder $VIDEO_FOLDER \
     --saved_path $META_FILE_PATH
 
@@ -48,7 +48,7 @@ echo "Duration: $DURATION seconds"
 
 export START_TIME3=$(date +%s)
 # Get the motion score of all videos filtered by the video quality score and text score.
-python compute_motion_score.py \
+python3.10 compute_motion_score.py \
     --video_metadata_path $META_FILE_PATH \
     --video_folder $VIDEO_FOLDER \
     --saved_freq 10 \
