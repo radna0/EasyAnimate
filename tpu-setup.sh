@@ -43,10 +43,6 @@ rm EasyAnimateV4-XL-2-InP.tar.gz
 cd ../../
 
 
-# Image Caption
-
-pip install lmdeploy==0.5.3
-
 # Video Caption
 pip install -r requirements.txt
 
