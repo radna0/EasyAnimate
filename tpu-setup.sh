@@ -1,7 +1,7 @@
 cd ~
 export DEBIAN_FRONTEND=noninteractive
 
-sudo apt-get update -y
+apt-get update -y
 sudo apt-get install software-properties-common -y
 
 DEBIAN_FRONTEND=noninteractive sudo add-apt-repository ppa:deadsnakes/ppa -y
@@ -12,9 +12,12 @@ python3.10 --version
 
 sudo curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.10
 
+sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+
+
 sudo pip uninstall -y tensorflow tensorflow-cpu
 
-sudo pip install accelerate diffusers transformers loguru peft
+sudo pip install accelerate diffusers transformers loguru peft pandas
 
 sudo apt-get install -y libgl1 libglib2.0-0 google-perftools
 
@@ -44,35 +47,44 @@ cd ../../
 
 
 # Video Caption
-pip install -r requirements.txt
+sudo pip install -r requirements.txt
 
 cd easyanimate/video_caption && pip install -r requirements.txt --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/
 
-site_pkg_path=$(python3.10 -c 'import site; print(site.getsitepackages()[0])')
+site_pkg_path=$(python -c 'import site; print(site.getsitepackages()[0])')
 cp -v easyocr_detection_patched.py $site_pkg_path/easyocr/detection.py
 
 sudo apt install -y ffmpeg   
 
 sudo pip install --upgrade accelerate
 
+
 # TPU all gather implementation
 cd $site_pkg_path/accelerate/utils/
 sudo rm -rf operations.py
 sudo wget -O operations.py https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/operations.py
 
-#Accelerate config
+
+# Accelerate config
+
+accelerate config default
 cd ~/.cache/huggingface/accelerate/
+rm default_config.yaml
 wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/config.yaml
 
+
+
 # Pytorch XLA
-pip uninstall torch torchvision -y
+pip uninstall torch torch_xla torchvision -y
 pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
 pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-nightly-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
+
+pip install git+https://github.com/google/cloud-accelerator-diagnostics/#subdirectory=tpu_info
 
 
 # Xformers
 cd ~
-pip install ninja
+sudo pip install ninja
 sudo python3.10 -m pip install -v -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
 
 
