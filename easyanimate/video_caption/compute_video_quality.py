@@ -137,7 +137,7 @@ def main():
     print(f"Batch size: {mem} GB for batch size: {args.batch_size}")
 
     if mem < 10:
-        args.batch_size = 16
+        args.batch_size = 12
     else:
         args.batch_size = 32
     print(f"Batch size: {args.batch_size}")
