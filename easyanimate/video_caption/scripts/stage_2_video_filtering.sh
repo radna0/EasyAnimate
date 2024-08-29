@@ -23,7 +23,7 @@ accelerate launch compute_video_quality.py \
     --num_sampled_frames 4 \
     --saved_freq 10 \
     --saved_path $VIDEO_QUALITY_SAVED_PATH \
-    --batch_size 64
+    --batch_size 32
 
 # measure the duration to process
 export END_TIME=$(date +%s)
