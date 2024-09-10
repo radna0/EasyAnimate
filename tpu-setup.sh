@@ -1,7 +1,10 @@
 cd ~
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update -y
+curl -f https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | sudo apt-key add -
+
+sudo apt-get update -y
 sudo apt-get install software-properties-common -y
 
 DEBIAN_FRONTEND=noninteractive sudo add-apt-repository ppa:deadsnakes/ppa -y
@@ -13,6 +16,8 @@ python3.10 --version
 sudo curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.10
 
 sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+
 
 
 sudo pip uninstall -y tensorflow tensorflow-cpu
@@ -75,11 +80,12 @@ wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate
 
 
 # Pytorch XLA
-pip uninstall torch torch_xla torchvision -y
-pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-nightly-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
+sudo pip uninstall torch torch_xla torchvision -y
+pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-2.5.0.dev-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
+pip install -U "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
-pip install git+https://github.com/google/cloud-accelerator-diagnostics/#subdirectory=tpu_info
+sudo pip install git+https://github.com/google/cloud-accelerator-diagnostics/#subdirectory=tpu_info
 
 
 # Xformers
