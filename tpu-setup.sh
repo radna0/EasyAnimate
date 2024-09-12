@@ -15,14 +15,15 @@ python3.10 --version
 
 sudo curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.10
 
-sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
-
-
-
 sudo pip uninstall -y tensorflow tensorflow-cpu
 
 sudo pip install accelerate diffusers transformers loguru peft pandas
+
+pip install --upgrade diffusers
+
+pip install markupsafe==2.0.1
+
+pip install git+https://github.com/huggingface/transformers
 
 sudo apt-get install -y libgl1 libglib2.0-0 google-perftools
 
@@ -56,7 +57,7 @@ sudo pip install -r requirements.txt
 
 cd easyanimate/video_caption && pip install -r requirements.txt --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/
 
-site_pkg_path=$(python -c 'import site; print(site.getsitepackages()[0])')
+site_pkg_path=$(python3.10 -c 'import site; print(site.getsitepackages()[0])')
 cp -v easyocr_detection_patched.py $site_pkg_path/easyocr/detection.py
 
 sudo apt install -y ffmpeg   
@@ -85,8 +86,6 @@ pip3 install --pre torch torchvision --index-url https://download.pytorch.org/wh
 pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-2.5.0.dev-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
 pip install -U "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
-sudo pip install git+https://github.com/google/cloud-accelerator-diagnostics/#subdirectory=tpu_info
-
 
 # Xformers
 cd ~
@@ -100,7 +99,7 @@ echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /
 
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 
-sudo apt-get update 
+sudo apt-get update
 sudo apt-get -y install gcsfuse
 sudo apt-get -y upgrade gcsfuse
 
@@ -108,3 +107,6 @@ sudo apt-get -y upgrade gcsfuse
 gcloud auth activate-service-account --key-file=service_account.json
 
 gcloud config set project easyanimate-431707
+
+
+
