@@ -1,6 +1,9 @@
 cd ~
 export DEBIAN_FRONTEND=noninteractive
 
+curl -f https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    | sudo apt-key add -
+
 sudo apt-get update -y
 sudo apt-get install software-properties-common -y
 
@@ -14,7 +17,13 @@ sudo curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.10
 
 sudo pip uninstall -y tensorflow tensorflow-cpu
 
-sudo pip install accelerate diffusers transformers loguru peft
+sudo pip install accelerate diffusers transformers loguru peft pandas
+
+pip install --upgrade diffusers
+
+pip install markupsafe==2.0.1
+
+pip install git+https://github.com/huggingface/transformers
 
 sudo apt-get install -y libgl1 libglib2.0-0 google-perftools
 
@@ -44,7 +53,7 @@ cd ../../
 
 
 # Video Caption
-pip install -r requirements.txt
+sudo pip install -r requirements.txt
 
 cd easyanimate/video_caption && pip install -r requirements.txt --extra-index-url https://huggingface.github.io/autogptq-index/whl/cu118/
 
@@ -55,24 +64,32 @@ sudo apt install -y ffmpeg
 
 sudo pip install --upgrade accelerate
 
+
 # TPU all gather implementation
 cd $site_pkg_path/accelerate/utils/
 sudo rm -rf operations.py
 sudo wget -O operations.py https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/operations.py
 
-#Accelerate config
+
+# Accelerate config
+
+accelerate config default
 cd ~/.cache/huggingface/accelerate/
+rm default_config.yaml
 wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate/TPU/accelerate/config.yaml
 
+
+
 # Pytorch XLA
-pip uninstall torch torchvision -y
-pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
-pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-nightly-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
+sudo pip uninstall torch torch_xla torchvision -y
+pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+pip install 'torch_xla[tpu] @ https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-2.5.0.dev-cp310-cp310-linux_x86_64.whl' -f https://storage.googleapis.com/libtpu-releases/index.html
+pip install -U "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
 
 # Xformers
 cd ~
-pip install ninja
+sudo pip install ninja
 sudo python3.10 -m pip install -v -U git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
 
 
@@ -82,7 +99,7 @@ echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /
 
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
 
-sudo apt-get update 
+sudo apt-get update
 sudo apt-get -y install gcsfuse
 sudo apt-get -y upgrade gcsfuse
 
@@ -90,3 +107,6 @@ sudo apt-get -y upgrade gcsfuse
 gcloud auth activate-service-account --key-file=service_account.json
 
 gcloud config set project easyanimate-431707
+
+
+
