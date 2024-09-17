@@ -192,7 +192,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder(DiffusionPipeline):
         scheduler: DDPMScheduler,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPImageProcessor,
-        requires_safety_checker: bool = True,
+        requires_safety_checker: bool = False,
         text_encoder_2=T5EncoderModel,
         tokenizer_2=MT5Tokenizer,
     ):

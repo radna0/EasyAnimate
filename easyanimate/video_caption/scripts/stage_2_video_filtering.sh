@@ -1,10 +1,10 @@
-META_FILE_PATH="datasets/qbit-downloads_batch/meta_file_info_$1.jsonl"
-VIDEO_FOLDER="datasets/qbit-downloads_batch/data_$1/data/"
-VIDEO_QUALITY_SAVED_PATH="datasets/qbit-downloads_batch/data_$1/meta_quality_info_siglip.jsonl"
+META_FILE_PATH="datasets/Qbit_Downloads/meta_file_info_$1.jsonl"
+VIDEO_FOLDER="datasets/Qbit_Downloads/data_$1/data/"
+VIDEO_QUALITY_SAVED_PATH="datasets/Qbit_Downloads/data_$1/meta_quality_info_siglip.jsonl"
 MIN_ASETHETIC_SCORE_SIGLIP=4.0
-TEXT_SAVED_PATH="datasets/qbit-downloads_batch/data_$1/meta_text_info.jsonl"
+TEXT_SAVED_PATH="datasets/Qbit_Downloads/data_$1/meta_text_info.jsonl"
 MIN_TEXT_SCORE=0.02
-MOTION_SAVED_PATH="datasets/qbit-downloads_batch/data_$1/meta_motion_info.jsonl"
+MOTION_SAVED_PATH="datasets/Qbit_Downloads/data_$1/meta_motion_info.jsonl"
 
 # measure the duration to process
 export START_TIME=$(date +%s)
@@ -23,7 +23,7 @@ accelerate launch compute_video_quality.py \
     --num_sampled_frames 4 \
     --saved_freq 10 \
     --saved_path $VIDEO_QUALITY_SAVED_PATH \
-    --batch_size 64
+    --batch_size 12
 
 # measure the duration to process
 export END_TIME=$(date +%s)

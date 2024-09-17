@@ -5,6 +5,12 @@ import torch_xla as xla
 import torch_xla.core.xla_model as xm
 import torch_xla.runtime as xr
 import torch_xla.distributed.spmd as xs
+
+
+from torch_xla.experimental.spmd_fully_sharded_data_parallel import (
+    _prepare_spmd_partition_spec,
+    SpmdFullyShardedDataParallel as FSDPv2,
+)
 import time
 import torch
 import json
@@ -37,14 +43,6 @@ from easyanimate.utils.lora_utils import merge_lora, unmerge_lora
 from easyanimate.utils.utils import get_image_to_video_latent, save_videos_grid
 import random
 
-start = time.time()
-
-device = xm.xla_device()
-
-
-import torch_xla as xla
-import torch_xla.core.xla_model as xm
-import time
 
 start = time.time()
 
@@ -53,48 +51,31 @@ device = xm.xla_device()
 low_gpu_memory_mode = False
 
 # Config and model path
-<<<<<<< HEAD
 config_path = "config/easyanimate_video_slicevae_multi_text_encoder_v4.yaml"
 model_name = "models/Diffusion_Transformer/EasyAnimateV4-XL-2-InP"
-=======
-config_path = "config/easyanimate_video_slicevae_motion_module_v3.yaml"
-model_name = "models/Diffusion_Transformer/EasyAnimateV3-XL-2-InP-960x960"
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 
 # Choose the sampler in "Euler" "Euler A" "DPM++" "PNDM" and "DDIM"
 sampler_name = "Euler"
 
 # Load pretrained model if need
 transformer_path = None
-<<<<<<< HEAD
 # V2 and V3 does not need a motion module
-=======
-# V2 does not need a motion module
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 motion_module_path = None
 vae_path = None
 lora_path = None
 
 # Other params
-<<<<<<< HEAD
 sample_size = [960, 1680]
 # In EasyAnimateV1, the video_length of video is 40 ~ 80.
-# In EasyAnimateV2 and V3, the video_length of video is 1 ~ 144. If u want to generate a image, please set the video_length = 1.
-video_length = 144
-=======
-sample_size = [384, 672]
-# In EasyAnimateV1, the video_length of video is 40 ~ 80.
-# In EasyAnimateV2 and V3, the video_length of video is 1 ~ 144. If u want to generate a image, please set the video_length = 1.
+# In EasyAnimateV2 and V3, the video_length of video is 1 ~ 144. If u want to generate a im age, please set the video_length = 1.
 video_length = 1
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 fps = 24
 
 # Use torch.float16 if GPU does not support torch.bfloat16
 # ome graphics cards, such as v100, 2080ti, do not support torch.bfloat16
 weight_dtype = torch.bfloat16
-<<<<<<< HEAD
 # We support English and Chinese in V4
-prompt = "This video features a girl with fox ears set against a striking red and black gradient background. In an upper-body shot, she is wearing striped pants, though only part of them is visible. Her gaze is directly at the viewer, creating a strong connection. The animation is of exceptional quality, with sharp details, vibrant colors, and smooth movement. The video is noted for its high resolution ('absurdres'), ensuring every detail is captured with clarity. Overall, this visually stunning masterpiece highlights the girl's fantasy-like appearance in a captivating and polished presentation."
+prompt = "a cute animated girl"
 negative_prompt = "The video is not of a high quality, it has a low resolution, and the audio quality is not clear. Strange motion trajectory, a poor composition and deformed video, low resolution, duplicate and ugly, strange body structure, long and strange neck, bad teeth, bad eyes, bad limbs, bad hands, rotating camera, blurry camera, shaking camera. Deformation, low-resolution, blurry, ugly, distortion."
 # prompt              = "A young woman with beautiful and clear eyes and blonde hair standing and white dress in a forest wearing a crown. She seems to be lost in thought, and the camera focuses on her face. The video is of high quality, and the view is very clear. High quality, masterpiece, best quality, highres, ultra-detailed, fantastic."
 # negative_prompt     = "The video is not of a high quality, it has a low resolution, and the audio quality is not clear. Strange motion trajectory, a poor composition and deformed video, low resolution, duplicate and ugly, strange body structure, long and strange neck, bad teeth, bad eyes, bad limbs, bad hands, rotating camera, blurry camera, shaking camera. Deformation, low-resolution, blurry, ugly, distortion. "
@@ -103,14 +84,6 @@ guidance_scale = 7.0
 seed = random.randint(0, 99999)
 num_inference_steps = 25
 lora_weight = 0.60
-=======
-prompt = "A young woman with beautiful and clear eyes and blonde hair standing and white dress in a forest wearing a crown. She seems to be lost in thought, and the camera focuses on her face. The video is of high quality, and the view is very clear. High quality, masterpiece, best quality, highres, ultra-detailed, fantastic."
-negative_prompt = "The video is not of a high quality, it has a low resolution, and the audio quality is not clear. Strange motion trajectory, a poor composition and deformed video, low resolution, duplicate and ugly, strange body structure, long and strange neck, bad teeth, bad eyes, bad limbs, bad hands, rotating camera, blurry camera, shaking camera. Deformation, low-resolution, blurry, ugly, distortion. "
-guidance_scale = 7.0
-seed = 43
-num_inference_steps = 25
-lora_weight = 0.55
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 save_path = "samples/easyanimate-videos"
 
 config = OmegaConf.load(config_path)
@@ -250,17 +223,13 @@ if low_gpu_memory_mode:
     pipeline.enable_sequential_cpu_offload(device=device)
 else:
     pipeline.enable_model_cpu_offload(device=device)
-<<<<<<< HEAD
 
 generator = torch.Generator(device="cpu").manual_seed(seed)
 
-=======
-
-generator = torch.Generator(device="cpu").manual_seed(seed)
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041
 
 if lora_path is not None:
     pipeline = merge_lora(pipeline, lora_path, lora_weight)
+
 
 with torch.no_grad():
     if transformer.config.in_channels != vae.config.latent_channels:
@@ -321,8 +290,4 @@ else:
     video_path = os.path.join(save_path, prefix + ".mp4")
     save_videos_grid(sample, video_path, fps=fps)
 
-<<<<<<< HEAD
 print(f"Time taken: {time.time() - start}")
-=======
-print(f"Time Taken: {time.time() - start}")
->>>>>>> f8e2a2ac3ede7c115908ad39c57f9e4f7c299041

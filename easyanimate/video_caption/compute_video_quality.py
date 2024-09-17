@@ -137,9 +137,9 @@ def main():
     print(f"Batch size: {mem} GB for batch size: {args.batch_size}")
 
     if mem < 10:
-        args.batch_size = 32
+        args.batch_size = 12
     else:
-        args.batch_size = 64
+        args.batch_size = 24
     print(f"Batch size: {args.batch_size}")
     metric_fns = []
     for metric in args.metrics:

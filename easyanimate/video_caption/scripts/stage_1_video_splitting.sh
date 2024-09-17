@@ -1,8 +1,8 @@
-VIDEO_FOLDER="datasets/qbit-downloads_batch/qbit_downloads_dataset_batch_$1/"
-META_FILE_PATH="datasets/qbit-downloads_batch/meta_file_info_$1.jsonl"
-SCENE_FOLDER="datasets/qbit-downloads_batch/meta_scene_info_$1/"
-SCENE_SAVED_PATH="datasets/qbit-downloads_batch/meta_scene_info_$1.jsonl"
-OUTPUT_FOLDER="datasets/qbit-downloads_batch/data_$1/data/"
+VIDEO_FOLDER="datasets/Qbit_Downloads/batch_$1/"
+META_FILE_PATH="datasets/Qbit_Downloads/meta_file_info_$1.jsonl"
+SCENE_FOLDER="datasets/Qbit_Downloads/meta_scene_info_$1/"
+SCENE_SAVED_PATH="datasets/Qbit_Downloads/meta_scene_info_$1.jsonl"
+OUTPUT_FOLDER="datasets/Qbit_Downloads/data_$1/data/"
 RESOLUTION_THRESHOLD=$((960*960))
 
 # Set the duration range of video clips.

@@ -15,6 +15,7 @@ from tqdm import tqdm
 from transformers import AutoConfig, AutoTokenizer
 
 import tinychat.utils.constants
+
 # from tinychat.models.llava_llama import LlavaLlamaForCausalLM
 from tinychat.models.vila_llama import VilaLlamaForCausalLM
 from tinychat.stream_generators.llava_stream_gen import LlavaStreamGenerator
@@ -40,7 +41,9 @@ gen_params.top_p = 1.0
 
 def extract_uniform_frames(video_path: str, num_sampled_frames: int = 8):
     vr = VideoReader(video_path)
-    sampled_frame_idx_list = np.linspace(0, len(vr), num_sampled_frames, endpoint=False, dtype=int)
+    sampled_frame_idx_list = np.linspace(
+        0, len(vr), num_sampled_frames, endpoint=False, dtype=int
+    )
     sampled_frame_list = []
     for idx in sampled_frame_idx_list:
         sampled_frame = Image.fromarray(vr[idx].asnumpy())
@@ -84,7 +87,11 @@ def parse_args():
     parser.add_argument(
         "--video_folder", type=str, default="", help="The video folder."
     )
-    parser.add_argument("--input_prompt", type=str, default="<video>\\n Elaborate on the visual and narrative elements of the video in detail.")
+    parser.add_argument(
+        "--input_prompt",
+        type=str,
+        default="<video>\\n Elaborate on the visual and narrative elements of the video in detail.",
+    )
     parser.add_argument(
         "--model_type", type=str, default="LLaMa", help="type of the model"
     )
@@ -114,28 +121,63 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--basic_metadata_path", type=str, default=None, help="The path to the basic metadata (csv/jsonl)."
+        "--basic_metadata_path",
+        type=str,
+        default=None,
+        help="The path to the basic metadata (csv/jsonl).",
     )
-    parser.add_argument("--min_resolution", type=float, default=0, help="The resolution threshold.")
-    parser.add_argument("--min_duration", type=float, default=-1, help="The minimum duration.")
-    parser.add_argument("--max_duration", type=float, default=-1, help="The maximum duration.")
     parser.add_argument(
-        "--asethetic_score_metadata_path", type=str, default=None, help="The path to the video quality metadata (csv/jsonl)."
+        "--min_resolution", type=float, default=0, help="The resolution threshold."
     )
-    parser.add_argument("--min_asethetic_score", type=float, default=4.0, help="The asethetic score threshold.")
     parser.add_argument(
-        "--asethetic_score_siglip_metadata_path", type=str, default=None, help="The path to the video quality metadata (csv/jsonl)."
+        "--min_duration", type=float, default=-1, help="The minimum duration."
     )
-    parser.add_argument("--min_asethetic_score_siglip", type=float, default=4.0, help="The asethetic score (SigLIP) threshold.")
     parser.add_argument(
-        "--text_score_metadata_path", type=str, default=None, help="The path to the video text score metadata (csv/jsonl)."
+        "--max_duration", type=float, default=-1, help="The maximum duration."
     )
-    parser.add_argument("--min_text_score", type=float, default=0.02, help="The text threshold.")
     parser.add_argument(
-        "--motion_score_metadata_path", type=str, default=None, help="The path to the video motion score metadata (csv/jsonl)."
+        "--asethetic_score_metadata_path",
+        type=str,
+        default=None,
+        help="The path to the video quality metadata (csv/jsonl).",
     )
-    parser.add_argument("--min_motion_score", type=float, default=2, help="The motion threshold.")
-    
+    parser.add_argument(
+        "--min_asethetic_score",
+        type=float,
+        default=4.0,
+        help="The asethetic score threshold.",
+    )
+    parser.add_argument(
+        "--asethetic_score_siglip_metadata_path",
+        type=str,
+        default=None,
+        help="The path to the video quality metadata (csv/jsonl).",
+    )
+    parser.add_argument(
+        "--min_asethetic_score_siglip",
+        type=float,
+        default=4.0,
+        help="The asethetic score (SigLIP) threshold.",
+    )
+    parser.add_argument(
+        "--text_score_metadata_path",
+        type=str,
+        default=None,
+        help="The path to the video text score metadata (csv/jsonl).",
+    )
+    parser.add_argument(
+        "--min_text_score", type=float, default=0.02, help="The text threshold."
+    )
+    parser.add_argument(
+        "--motion_score_metadata_path",
+        type=str,
+        default=None,
+        help="The path to the video motion score metadata (csv/jsonl).",
+    )
+    parser.add_argument(
+        "--min_motion_score", type=float, default=2, help="The motion threshold."
+    )
+
     args = parser.parse_args()
     return args
 
@@ -159,11 +201,13 @@ def main(args):
         elif args.saved_path.endswith(".jsonl"):
             saved_metadata_df = pd.read_json(args.saved_path, lines=True)
         saved_video_path_list = saved_metadata_df[args.video_path_column].tolist()
-        video_path_list = list(set(video_path_list).difference(set(saved_video_path_list)))
+        video_path_list = list(
+            set(video_path_list).difference(set(saved_video_path_list))
+        )
         logger.info(
             f"Resume from {args.saved_path}: {len(saved_video_path_list)} processed and {len(video_path_list)} to be processed."
         )
-    
+
     video_path_list = filter(
         video_path_list,
         basic_metadata_path=args.basic_metadata_path,
@@ -179,7 +223,9 @@ def main(args):
         motion_score_metadata_path=args.motion_score_metadata_path,
         min_motion_score=args.min_motion_score,
     )
-    video_path_list = [os.path.join(args.video_folder, video_path) for video_path in video_path_list]
+    video_path_list = [
+        os.path.join(args.video_folder, video_path) for video_path in video_path_list
+    ]
     # Sorting to guarantee the same result for each process.
     video_path_list = natsorted(video_path_list)
 
@@ -193,7 +239,9 @@ def main(args):
     torch.nn.init.uniform_ = skip
     torch.nn.init.normal_ = skip
 
-    tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.model_path, "llm"), use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(
+        os.path.join(args.model_path, "llm"), use_fast=False
+    )
     tinychat.utils.constants.LLAVA_DEFAULT_IMAGE_PATCH_TOKEN_IDX = (
         tokenizer.convert_tokens_to_ids(
             [tinychat.utils.constants.LLAVA_DEFAULT_IMAGE_PATCH_TOKEN]
@@ -232,18 +280,29 @@ def main(args):
 
     elif args.precision == "W4A16":
         from tinychat.utils.load_quant import load_awq_model
+
         # Auto load quant_path from the 3b/8b/13b/40b model.
         if args.quant_path is None:
             if "VILA1.5-3b-s2-AWQ" in args.model_path:
-                args.quant_path = os.path.join(args.model_path, "llm/vila-1.5-3b-s2-w4-g128-awq-v2.pt")
+                args.quant_path = os.path.join(
+                    args.model_path, "llm/vila-1.5-3b-s2-w4-g128-awq-v2.pt"
+                )
             elif "VILA1.5-3b-AWQ" in args.model_path:
-                args.quant_path = os.path.join(args.model_path, "llm/vila-1.5-3b-w4-g128-awq-v2.pt")
+                args.quant_path = os.path.join(
+                    args.model_path, "llm/vila-1.5-3b-w4-g128-awq-v2.pt"
+                )
             elif "Llama-3-VILA1.5-8b-AWQ" in args.model_path:
-                args.quant_path = os.path.join(args.model_path, "llm/llama-3-vila1.5-8b-w4-g128-awq-v2.pt")
+                args.quant_path = os.path.join(
+                    args.model_path, "llm/llama-3-vila1.5-8b-w4-g128-awq-v2.pt"
+                )
             elif "VILA1.5-13b-AWQ" in args.model_path:
-                args.quant_path = os.path.join(args.model_path, "llm/vila-1.5-13b-w4-g128-awq-v2.pt")
+                args.quant_path = os.path.join(
+                    args.model_path, "llm/vila-1.5-13b-w4-g128-awq-v2.pt"
+                )
             elif "VILA1.5-40b-AWQ" in args.model_path:
-                args.quant_path = os.path.join(args.model_path, "llm/vila-1.5-40b-w4-g128-awq-v2.pt")
+                args.quant_path = os.path.join(
+                    args.model_path, "llm/vila-1.5-40b-w4-g128-awq-v2.pt"
+                )
         model.llm = load_awq_model(model.llm, args.quant_path, 4, 128, state.device)
         from tinychat.modules import (
             make_fused_mlp,
@@ -260,25 +319,25 @@ def main(args):
 
     else:
         raise NotImplementedError(f"Precision {args.precision} is not supported.")
-    
+
     device_warmup(state.device)
     tune_llava_patch_embedding(vision_tower, device=state.device)
 
     stream_generator = LlavaStreamGenerator
 
-    model_prompter = get_prompter(
-        args.model_type, args.model_path, False, False
-    )
+    model_prompter = get_prompter(args.model_type, args.model_path, False, False)
     stop_token_ids = get_stop_token_ids(args.model_type, args.model_path)
 
     model.eval()
 
     index = len(video_path_list) - len(video_path_list) % state.num_processes
     # Avoid the NCCL timeout in the final gather operation.
-    logger.info(f"Drop {len(video_path_list) % state.num_processes} videos to ensure each process handles the same number of videos.")
+    logger.info(
+        f"Drop {len(video_path_list) % state.num_processes} videos to ensure each process handles the same number of videos."
+    )
     video_path_list = video_path_list[:index]
     logger.info(f"{len(video_path_list)} videos are to be processed.")
-    
+
     result_dict = {args.video_path_column: [], args.caption_column: []}
     with state.split_between_processes(video_path_list) as splitted_video_path_list:
         # TODO: Use VideoDataset.
@@ -290,7 +349,8 @@ def main(args):
                 image_tensor = process_images(image_list, image_processor, model.config)
                 if type(image_tensor) is list:
                     image_tensor = [
-                        image.to(state.device, dtype=torch.float16) for image in image_tensor
+                        image.to(state.device, dtype=torch.float16)
+                        for image in image_tensor
                     ]
                 else:
                     image_tensor = image_tensor.to(state.device, dtype=torch.float16)
@@ -298,7 +358,9 @@ def main(args):
                 input_prompt = args.input_prompt
                 # Insert image here
                 image_token = get_image_token(model, args.model_path)
-                image_token_holder = tinychat.utils.constants.LLAVA_DEFAULT_IM_TOKEN_PLACE_HOLDER
+                image_token_holder = (
+                    tinychat.utils.constants.LLAVA_DEFAULT_IM_TOKEN_PLACE_HOLDER
+                )
                 im_token_count = input_prompt.count(image_token_holder)
                 if im_token_count == 0:
                     model_prompter.insert_prompt(image_token * image_num + input_prompt)
@@ -319,24 +381,37 @@ def main(args):
                 if len(outputs) != 0:
                     result_dict[args.video_path_column].append(Path(video_path).name)
                     result_dict[args.caption_column].append(outputs)
-            
+
             except Exception as e:
                 logger.warning(f"VILA with {video_path} failed. Error is {e}.")
 
             if i != 0 and i % args.saved_freq == 0:
                 state.wait_for_everyone()
-                gathered_result_dict = {k: gather_object(v) for k, v in result_dict.items()}
-                if state.is_main_process and len(gathered_result_dict[args.video_path_column]) != 0:
+                gathered_result_dict = {
+                    k: gather_object(v) for k, v in result_dict.items()
+                }
+                if (
+                    state.is_main_process
+                    and len(gathered_result_dict[args.video_path_column]) != 0
+                ):
                     result_df = pd.DataFrame(gathered_result_dict)
                     if args.saved_path.endswith(".csv"):
                         header = False if os.path.exists(args.saved_path) else True
-                        result_df.to_csv(args.saved_path, header=header, index=False, mode="a")
+                        result_df.to_csv(
+                            args.saved_path, header=header, index=False, mode="a"
+                        )
                     elif args.saved_path.endswith(".jsonl"):
-                        result_df.to_json(args.saved_path, orient="records", lines=True, mode="a", force_ascii=False)
+                        result_df.to_json(
+                            args.saved_path,
+                            orient="records",
+                            lines=True,
+                            mode="a",
+                            force_ascii=False,
+                        )
                     logger.info(f"Save result to {args.saved_path}.")
                 for k in result_dict.keys():
                     result_dict[k] = []
-    
+
     state.wait_for_everyone()
     gathered_result_dict = {k: gather_object(v) for k, v in result_dict.items()}
     if state.is_main_process and len(gathered_result_dict[args.video_path_column]) != 0:
@@ -345,7 +420,13 @@ def main(args):
             header = False if os.path.exists(args.saved_path) else True
             result_df.to_csv(args.saved_path, header=header, index=False, mode="a")
         elif args.saved_path.endswith(".jsonl"):
-            result_df.to_json(args.saved_path, orient="records", lines=True, mode="a", force_ascii=False)
+            result_df.to_json(
+                args.saved_path,
+                orient="records",
+                lines=True,
+                mode="a",
+                force_ascii=False,
+            )
         logger.info(f"Save result to {args.saved_path}.")
 
 
