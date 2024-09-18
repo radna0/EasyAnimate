@@ -17,13 +17,13 @@ A set of basic tensor ops compatible with tpu, gpu, and multigpu
 
 import pickle
 import warnings
+from contextlib import contextmanager, nullcontext
 from functools import update_wrapper, wraps
 from typing import Any, Mapping
 
 import torch
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.xla_backend as xla_dist
-from ..state import PartialState
+
+from ..state import AcceleratorState, PartialState
 from .constants import TORCH_DISTRIBUTED_OPERATION_TYPES
 from .dataclasses import DistributedType, TensorInformation
 from .imports import (
@@ -438,7 +438,6 @@ def gather(tensor):
     else:
         return tensor
 
-                
 def _tpu_gather_object(object: Any):
     output_objects = xm.mesh_reduce("accelerate.utils.gather_object", object, lambda x: x)
     # all_gather_object returns a list of lists, so we need to flatten it
@@ -448,8 +447,7 @@ def _gpu_gather_object(object: Any):
     output_objects = [None for _ in range(PartialState().num_processes)]
     torch.distributed.all_gather_object(output_objects, object)
     # all_gather_object returns a list of lists, so we need to flatten it
-    print(f"___________output_objects: {output_objects}")
-    return  output_objects
+    return [x for y in output_objects for x in y]
 
 
 def gather_object(object: Any):
@@ -852,3 +850,25 @@ def find_device(data):
                 return device
     elif isinstance(data, torch.Tensor):
         return data.device
+
+
+@contextmanager
+def GatheredParameters(params, modifier_rank=None, fwd_module=None, enabled=True):
+    """
+    Wrapper around `deepspeed.runtime.zero.GatheredParameters`, but if Zero-3 is not enabled, will be a no-op context
+    manager.
+    """
+    # We need to use the `AcceleratorState` here since it has access to the deepspeed plugin
+    if AcceleratorState().distributed_type != DistributedType.DEEPSPEED or (
+        AcceleratorState().deepspeed_plugin is not None
+        and not AcceleratorState().deepspeed_plugin.is_zero3_init_enabled()
+    ):
+        gather_param_context = nullcontext()
+    else:
+        import deepspeed
+
+        gather_param_context = deepspeed.zero.GatheredParameters(
+            params, modifier_rank=modifier_rank, fwd_module=fwd_module, enabled=enabled
+        )
+    with gather_param_context:
+        yield
