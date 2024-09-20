@@ -10,6 +10,10 @@ TRAIN_SAVED_PATH="datasets/Qbit_Downloads/train_qbit-downloads_$1.json"
 # Manually download Efficient-Large-Model/Llama-3-VILA1.5-8b-AWQ to VILA_MODEL_PATH.
 # Manually download meta-llama/Meta-Llama-3-8B-Instruct to REWRITE_MODEL_PATH.
 
+python3.10 -m utils.get_meta_file \
+    --video_folder $VIDEO_FOLDER \
+    --saved_path $META_FILE_PATH
+
 
 export START_TIME=$(date +%s)
 export START_TIME1=$(date +%s)
@@ -28,7 +32,7 @@ echo "Duration: $DURATION seconds"
 
 export START_TIME2=$(date +%s)
 # Rewrite video captions (optional).
-python caption_rewrite.py \
+python3.10 caption_rewrite.py \
     --video_metadata_path $VIDEO_CAPTION_SAVED_PATH \
     --batch_size 4096 \
     --model_name $REWRITE_MODEL_PATH \
@@ -60,7 +64,7 @@ export DURATION=$((END_TIME-START_TIME3))
 echo "Duration: $DURATION seconds"
 export START_TIME4=$(date +%s)
 # Get the final train file.
-python filter_meta_train.py \
+python3.10 filter_meta_train.py \
     --caption_metadata_path $REWRITTEN_VIDEO_CAPTION_SAVED_PATH \
     --video_folder=$VIDEO_FOLDER \
     --videoclipxl_score_metadata_path $VIDEOCLIPXL_SCORE_SAVED_PATH \
