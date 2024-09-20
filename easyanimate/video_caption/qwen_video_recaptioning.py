@@ -178,6 +178,7 @@ def main(args):
         video_metadata_df = pd.read_json(args.video_metadata_path, lines=True)
     else:
         raise ValueError("The video_metadata_path must end with .csv or .jsonl.")
+    print(video_metadata_df)
     video_path_list = video_metadata_df["video_path"].tolist()
     video_path_list = [os.path.basename(video_path) for video_path in video_path_list]
 
