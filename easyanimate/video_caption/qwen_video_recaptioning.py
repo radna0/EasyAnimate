@@ -16,6 +16,10 @@ import json
 from utils.filter import filter
 from utils.logger import logger
 
+
+# set env TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD
+os.environ["TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD"] = "99999999999999999999"
+
 # Initialize helpers for model management
 helpers = {}
 
@@ -179,6 +183,7 @@ def main(args):
     else:
         raise ValueError("The video_metadata_path must end with .csv or .jsonl.")
     print(video_metadata_df)
+    # video_metadata_df only has video_path column, take data without calling video_path column
     video_path_list = video_metadata_df["video_path"].tolist()
     video_path_list = [os.path.basename(video_path) for video_path in video_path_list]
 
