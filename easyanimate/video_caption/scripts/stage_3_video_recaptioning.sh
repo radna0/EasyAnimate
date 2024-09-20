@@ -19,8 +19,8 @@ export START_TIME=$(date +%s)
 export START_TIME1=$(date +%s)
 # Use VILA1.5-AWQ to perform recaptioning.
 python3.10 qwen_video_recaptioning.py \
-    --video_metadata_path $META_FILE_PATH \
-    --video_folder $VIDEO_FOLDER \
+    --video_metadata_path ${META_FILE_PATH} \
+    --video_folder ${VIDEO_FOLDER} \
     --saved_path $VIDEO_CAPTION_SAVED_PATH \
     --motion_score_metadata_path $MOTION_SAVED_PATH \
     --min_motion_score $MIN_MOTION_SCORE
