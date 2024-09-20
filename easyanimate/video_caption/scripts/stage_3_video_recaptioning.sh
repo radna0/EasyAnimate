@@ -26,3 +26,53 @@ export END_TIME=$(date +%s)
 export DURATION=$((END_TIME-START_TIME1))
 echo "Duration: $DURATION seconds"
 
+export START_TIME2=$(date +%s)
+# Rewrite video captions (optional).
+python caption_rewrite.py \
+    --video_metadata_path $VIDEO_CAPTION_SAVED_PATH \
+    --batch_size 4096 \
+    --model_name $REWRITE_MODEL_PATH \
+    --prompt prompt/rewrite.txt \
+    --prefix '"rewritten description": ' \
+    --saved_path $REWRITTEN_VIDEO_CAPTION_SAVED_PATH \
+    --saved_freq 1
+# measure the duration to process
+export END_TIME=$(date +%s)
+export DURATION=$((END_TIME-START_TIME2))
+echo "Duration: $DURATION seconds"
+export START_TIME3=$(date +%s)
+
+
+# Compute caption-video alignment (optional).
+accelerate launch compute_video_quality.py \
+    --video_metadata_path $REWRITTEN_VIDEO_CAPTION_SAVED_PATH \
+    --caption_column caption \
+    --video_folder $VIDEO_FOLDER \
+    --frame_sample_method uniform \
+    --num_sampled_frames 8 \
+    --metrics VideoCLIPXLScore \
+    --batch_size 64 \
+    --saved_path $VIDEOCLIPXL_SCORE_SAVED_PATH \
+    --saved_freq 10
+# measure the duration to process
+export END_TIME=$(date +%s)
+export DURATION=$((END_TIME-START_TIME3))
+echo "Duration: $DURATION seconds"
+export START_TIME4=$(date +%s)
+# Get the final train file.
+python filter_meta_train.py \
+    --caption_metadata_path $REWRITTEN_VIDEO_CAPTION_SAVED_PATH \
+    --video_folder=$VIDEO_FOLDER \
+    --videoclipxl_score_metadata_path $VIDEOCLIPXL_SCORE_SAVED_PATH \
+    --min_videoclipxl_score $MIN_VIDEOCLIPXL_SCORE \
+    --saved_path=$TRAIN_SAVED_PATH
+# measure the duration to process
+export END_TIME=$(date +%s)
+export DURATION=$((END_TIME-START_TIME4))
+echo "Duration: $DURATION seconds"
+
+
+# measure the duration to process
+export END_TIME=$(date +%s)
+export DURATION=$((END_TIME-START_TIME))
+echo "Duration: $DURATION seconds"
