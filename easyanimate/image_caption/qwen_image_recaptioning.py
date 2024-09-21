@@ -13,7 +13,6 @@ from natsort import natsorted
 from tqdm import tqdm
 import json
 
-from utils.filter import filter
 from utils.logger import logger
 
 
@@ -101,7 +100,7 @@ def parse_args():
     parser.add_argument(
         "--input_prompt",
         type=str,
-        default="Describe this video. In detail.",
+        default="Describe this image. In detail.",
     )
     parser.add_argument(
         "--saved_path",
@@ -110,66 +109,9 @@ def parse_args():
         help="The save path to the output results (csv/jsonl).",
     )
     parser.add_argument(
-        "--basic_metadata_path",
-        type=str,
-        default=None,
-        help="The path to the basic metadata (csv/jsonl).",
-    )
-    parser.add_argument(
-        "--min_resolution", type=float, default=0, help="The resolution threshold."
-    )
-    parser.add_argument(
-        "--min_duration", type=float, default=-1, help="The minimum duration."
-    )
-    parser.add_argument(
-        "--max_duration", type=float, default=-1, help="The maximum duration."
-    )
-    parser.add_argument(
-        "--asethetic_score_metadata_path",
-        type=str,
-        default=None,
-        help="The path to the video quality metadata (csv/jsonl).",
-    )
-    parser.add_argument(
-        "--min_asethetic_score",
-        type=float,
-        default=4.0,
-        help="The asethetic score threshold.",
-    )
-    parser.add_argument(
-        "--asethetic_score_siglip_metadata_path",
-        type=str,
-        default=None,
-        help="The path to the video quality metadata (csv/jsonl).",
-    )
-    parser.add_argument(
-        "--min_asethetic_score_siglip",
-        type=float,
-        default=4.0,
-        help="The asethetic score (SigLIP) threshold.",
-    )
-    parser.add_argument(
-        "--text_score_metadata_path",
-        type=str,
-        default=None,
-        help="The path to the video text score metadata (csv/jsonl).",
-    )
-    parser.add_argument(
-        "--min_text_score", type=float, default=0.02, help="The text threshold."
-    )
-    parser.add_argument(
-        "--motion_score_metadata_path",
-        type=str,
-        default=None,
-        help="The path to the video motion score metadata (csv/jsonl).",
-    )
-    parser.add_argument(
-        "--min_motion_score", type=float, default=2, help="The motion threshold."
-    )
-    parser.add_argument(
         "--saved_freq",
         type=int,
-        default=10,
+        default=100,
         help="Frequency to save intermediate results.",
     )
     return parser.parse_args()
@@ -184,7 +126,7 @@ def main(args):
         raise ValueError("The video_metadata_path must end with .csv or .jsonl.")
     print(video_metadata_df)
     # video_metadata_df only has video_path column, take data without calling video_path column
-    video_path_list = video_metadata_df["video_path"].tolist()
+    video_path_list = video_metadata_df["file_path"].tolist()
     video_path_list = [os.path.basename(video_path) for video_path in video_path_list]
 
     if not (args.saved_path.endswith(".csv") or args.saved_path.endswith(".jsonl")):
@@ -195,29 +137,13 @@ def main(args):
             saved_metadata_df = pd.read_csv(args.saved_path)
         elif args.saved_path.endswith(".jsonl"):
             saved_metadata_df = pd.read_json(args.saved_path, lines=True)
-        saved_video_path_list = saved_metadata_df["video_path"].tolist()
+        saved_video_path_list = saved_metadata_df["file_path"].tolist()
         video_path_list = list(
             set(video_path_list).difference(set(saved_video_path_list))
         )
         logger.info(
             f"Resume from {args.saved_path}: {len(saved_video_path_list)} processed and {len(video_path_list)} to be processed."
         )
-
-    video_path_list = filter(
-        video_path_list,
-        basic_metadata_path=args.basic_metadata_path,
-        min_resolution=args.min_resolution,
-        min_duration=args.min_duration,
-        max_duration=args.max_duration,
-        asethetic_score_metadata_path=args.asethetic_score_metadata_path,
-        min_asethetic_score=args.min_asethetic_score,
-        asethetic_score_siglip_metadata_path=args.asethetic_score_siglip_metadata_path,
-        min_asethetic_score_siglip=args.min_asethetic_score_siglip,
-        text_score_metadata_path=args.text_score_metadata_path,
-        min_text_score=args.min_text_score,
-        motion_score_metadata_path=args.motion_score_metadata_path,
-        min_motion_score=args.min_motion_score,
-    )
 
     video_path_list = [
         os.path.join(args.video_folder, video_path) for video_path in video_path_list
@@ -236,9 +162,8 @@ def main(args):
                     "role": "user",
                     "content": [
                         {
-                            "type": "video",
-                            "video": f"file://./{video_path}",
-                            "fps": 1.0,
+                            "type": "image",
+                            "image": f"file://./{video_path}",
                         },
                         {"type": "text", "text": input_prompt},
                     ],
