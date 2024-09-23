@@ -46,7 +46,9 @@ import random
 
 start = time.time()
 
-device = xm.xla_device()
+xla.experimental.eager_mode(True)
+
+device = xla.device()
 # Low gpu memory mode, this is used when the GPU memory is under 16GB
 low_gpu_memory_mode = False
 
@@ -68,7 +70,7 @@ lora_path = None
 sample_size = [960, 1680]
 # In EasyAnimateV1, the video_length of video is 40 ~ 80.
 # In EasyAnimateV2 and V3, the video_length of video is 1 ~ 144. If u want to generate a im age, please set the video_length = 1.
-video_length = 1
+video_length = 24
 fps = 24
 
 # Use torch.float16 if GPU does not support torch.bfloat16

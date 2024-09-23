@@ -62,7 +62,23 @@ from transformers import (
 from .pipeline_easyanimate import EasyAnimatePipelineOutput
 
 if is_torch_xla_available():
+    import torch_xla as xla
     import torch_xla.core.xla_model as xm
+    import torch_xla.distributed.spmd as xs
+    from torch_xla.experimental.spmd_fully_sharded_data_parallel import (
+        SpmdFullyShardedDataParallel as FSDPv2,
+        _prepare_spmd_partition_spec,
+    )
+    from torch_xla import runtime as xr
+
+    xr.use_spmd()
+    # Define the mesh following common SPMD practice
+    num_devices = xr.global_runtime_device_count()
+    mesh_shape = (num_devices, 1)
+    device_ids = np.array(range(num_devices))
+    # To be noted, the mesh must have an axis named 'fsdp', which the weights and activations will be sharded on.
+    mesh = xs.Mesh(device_ids, mesh_shape, ("fsdp", "model"))
+    xs.set_global_mesh(mesh)
 
     XLA_AVAILABLE = True
 else:
@@ -247,6 +263,9 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             clip_image_processor=clip_image_processor,
             clip_image_encoder=clip_image_encoder,
         )
+
+        self.vae = FSDPv2(vae)
+        self.transformer = FSDPv2(transformer)
 
         if safety_checker is None and requires_safety_checker:
             logger.warning(
@@ -1489,6 +1508,12 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     latent_model_input.shape[0]
                 ).to(dtype=latent_model_input.dtype)
 
+                xs.mark_sharding(
+                    latent_model_input,
+                    xs.get_global_mesh(),
+                    _prepare_spmd_partition_spec(latent_model_input),
+                )
+
                 # predict the noise residual
                 noise_pred = self.transformer(
                     latent_model_input,
@@ -1563,7 +1588,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     progress_bar.update()
 
                 if XLA_AVAILABLE:
-                    xm.mark_step()
+                    xla.sync()
 
                 print(f"Mark Step Checkpoint {i}, {t}")
                 if comfyui_progressbar:
