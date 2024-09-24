@@ -12,6 +12,9 @@ from .longclip import longclip
 from .viclip import get_viclip
 from .video_utils import extract_frames
 
+import torch
+import torch_xla
+
 # All metrics.
 __all__ = ["VideoCLIPXLScore"]
 
@@ -26,10 +29,11 @@ _MD5 = {
     "VideoCLIP-XL-v2": "cebda0bab14b677ec061a57e80791f35",
 }
 
+
 def normalize(
     data: np.array,
     mean: list[float] = [0.485, 0.456, 0.406],
-    std: list[float] = [0.229, 0.224, 0.225]
+    std: list[float] = [0.229, 0.224, 0.225],
 ):
     v_mean = np.array(mean).reshape(1, 1, 3)
     v_std = np.array(std).reshape(1, 1, 3)
@@ -44,23 +48,27 @@ class VideoCLIPXL(nn.Module):
         self.root = os.path.expanduser(root)
         if not os.path.exists(self.root):
             os.makedirs(self.root)
-        
+
         k = "LongCLIP-L"
         filename = os.path.basename(_MODELS[k])
         download_url(_MODELS[k], self.root, filename=filename, md5=_MD5[k])
-        self.model = longclip.load(os.path.join(self.root, filename), device="cpu")[0].float()
+        self.model = longclip.load(os.path.join(self.root, filename), device="cpu")[
+            0
+        ].float()
 
         k = "ViClip-InternVid-10M-FLT"
         filename = os.path.basename(_MODELS[k])
         download_url(_MODELS[k], self.root, filename=filename, md5=_MD5[k])
-        self.viclip_model = get_viclip("l", os.path.join(self.root, filename))["viclip"].float()
+        self.viclip_model = get_viclip("l", os.path.join(self.root, filename))[
+            "viclip"
+        ].float()
 
         # delete unused encoder
         del self.model.visual
         del self.viclip_model.text_encoder
 
 
-class VideoCLIPXLScore():
+class VideoCLIPXLScore:
     def __init__(self, root: str = "~/.cache/clip", device: str = "cpu"):
         self.root = os.path.expanduser(root)
         if not os.path.exists(self.root):
@@ -75,21 +83,34 @@ class VideoCLIPXLScore():
         self.model.to(device)
 
         self.device = device
-    
+
     def __call__(self, videos: List[List[Image.Image]], texts: List[str]):
         assert len(videos) == len(texts)
 
         # Use cv2.resize in accordance with the official demo. Resize and Normalize => B * [T, 224, 224, 3].
-        videos = [[cv2.cvtColor(np.array(f), cv2.COLOR_RGB2BGR) for f in v] for v in videos]
+        videos = [
+            [cv2.cvtColor(np.array(f), cv2.COLOR_RGB2BGR) for f in v] for v in videos
+        ]
         resize_videos = [[cv2.resize(f, (224, 224)) for f in v] for v in videos]
         resize_normalizied_videos = [normalize(np.stack(v)) for v in resize_videos]
 
-        video_inputs = torch.stack([torch.from_numpy(v) for v in resize_normalizied_videos])
-        video_inputs = video_inputs.float().permute(0, 1, 4, 2, 3).to(self.device, non_blocking=True)  # BTCHW
+        video_inputs = torch.stack(
+            [torch.from_numpy(v) for v in resize_normalizied_videos]
+        )
+        video_inputs = (
+            video_inputs.float()
+            .permute(0, 1, 4, 2, 3)
+            .to(self.device, non_blocking=True)
+        )  # BTCHW
 
         with torch.no_grad():
             vid_features = torch.stack(
-                [self.model.viclip_model.get_vid_features(x.unsqueeze(0)).float() for x in video_inputs]
+                [
+                    self.model.viclip_model.get_vid_features(
+                        x.unsqueeze(0).to(self.device)
+                    ).float()
+                    for x in video_inputs
+                ]
             )
             vid_features.squeeze_()
             # vid_features = self.model.viclip_model.get_vid_features(video_inputs).float()
@@ -97,9 +118,9 @@ class VideoCLIPXLScore():
             text_features = self.model.model.encode_text(text_inputs)
             text_features = text_features / text_features.norm(dim=1, keepdim=True)
             scores = text_features @ vid_features.T
-        
+
         return scores.tolist() if len(videos) == 1 else scores.diagonal().tolist()
-    
+
     def __repr__(self):
         return "videoclipxl_score"
 
@@ -109,12 +130,14 @@ if __name__ == "__main__":
     texts = [
         "a joker",
         "glasses and flower",
-        "The video opens with a view of a white building with multiple windows, partially obscured by leafless tree branches. The scene transitions to a closer view of the same building, with the tree branches more prominent in the foreground. The focus then shifts to a street sign that reads 'Abesses' in bold, yellow letters against a green background. The sign is attached to a metal structure, possibly a tram or bus stop. The sign is illuminated by a light source above it, and the background reveals a glimpse of the building and tree branches from earlier shots. The colors are muted, with the yellow sign standing out against the grey and green hues."
+        "The video opens with a view of a white building with multiple windows, partially obscured by leafless tree branches. The scene transitions to a closer view of the same building, with the tree branches more prominent in the foreground. The focus then shifts to a street sign that reads 'Abesses' in bold, yellow letters against a green background. The sign is attached to a metal structure, possibly a tram or bus stop. The sign is illuminated by a light source above it, and the background reveals a glimpse of the building and tree branches from earlier shots. The colors are muted, with the yellow sign standing out against the grey and green hues.",
     ]
 
-    video_clip_xl_score = VideoCLIPXLScore(device="cuda")
+    video_clip_xl_score = VideoCLIPXLScore(device=torch_xla.device())
     batch_frames = []
     for v in videos:
-        sampled_frames = extract_frames(v, sample_method="uniform", num_sampled_frames=8)[1]
+        sampled_frames = extract_frames(
+            v, sample_method="uniform", num_sampled_frames=8
+        )[1]
         batch_frames.append(sampled_frames)
     print(video_clip_xl_score(batch_frames, texts))
