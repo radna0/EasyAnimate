@@ -137,7 +137,7 @@ def main(args):
             saved_metadata_df = pd.read_csv(args.saved_path)
         elif args.saved_path.endswith(".jsonl"):
             saved_metadata_df = pd.read_json(args.saved_path, lines=True)
-        saved_video_path_list = saved_metadata_df["file_path"].tolist()
+        saved_video_path_list = saved_metadata_df["video_path"].tolist()
         video_path_list = list(
             set(video_path_list).difference(set(saved_video_path_list))
         )
