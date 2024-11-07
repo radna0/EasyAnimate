@@ -29,6 +29,7 @@ import accelerate
 import diffusers
 import numpy as np
 import torch
+import torch_xla
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
@@ -130,7 +131,11 @@ def _get_2d_rotary_pos_embed_cached(embed_dim, crops_coords, grid_size):
     )
     if tmp_key not in rotary_pos_embed_cache:
         tmp_embed = get_2d_rotary_pos_embed(embed_dim, crops_coords, grid_size)
-        tmp_embed_gpu = (tmp_embed[0].cuda(), tmp_embed[1].cuda())
+        # replace cuda with xla
+        tmp_embed_gpu = (
+            tmp_embed[0].to(torch_xla.device()),
+            tmp_embed[1].to(torch_xla.device()),
+        )
         print("\tembed_dim=%d data_size=%s" % (embed_dim, tmp_embed[0].shape))
         rotary_pos_embed_cache[tmp_key] = tmp_embed_gpu
         return tmp_embed_gpu
@@ -330,7 +335,7 @@ def log_validation(
         for i in range(len(args.validation_prompts)):
             with torch.no_grad():
                 if args.train_mode != "normal":
-                    with torch.autocast("cuda", dtype=weight_dtype):
+                    with torch.autocast("xla", dtype=weight_dtype):
                         video_length = (
                             int(
                                 args.video_sample_n_frames
@@ -407,7 +412,7 @@ def log_validation(
                             ),
                         )
                 else:
-                    with torch.autocast("cuda", dtype=weight_dtype):
+                    with torch.autocast("xla", dtype=weight_dtype):
                         sample = pipeline(
                             args.validation_prompts[i],
                             video_length=args.video_sample_n_frames,
@@ -451,12 +456,10 @@ def log_validation(
             del clip_image_encoder
             del clip_image_processor
         gc.collect()
-        torch.cuda.empty_cache()
 
         return images
     except Exception as e:
         gc.collect()
-        torch.cuda.empty_cache()
 
         print(f"Eval error with info {e}")
         return None
@@ -2172,7 +2175,6 @@ def main():
                     )
 
                 if args.low_vram:
-                    torch.cuda.empty_cache()
                     vae.to(accelerator.device)
                     if not args.enable_text_encoder_in_dataloader:
                         text_encoder.to(accelerator.device)
@@ -2349,7 +2351,6 @@ def main():
 
                 if args.low_vram:
                     vae.to("cpu")
-                    torch.cuda.empty_cache()
                     if not args.enable_text_encoder_in_dataloader:
                         text_encoder.to(accelerator.device)
                         if text_encoder_2 is not None:
@@ -2421,7 +2422,6 @@ def main():
                     text_encoder.to("cpu")
                     if text_encoder_2 is not None:
                         text_encoder_2.to("cpu")
-                    torch.cuda.empty_cache()
 
                 bsz = latents.shape[0]
                 if args.noise_share_in_frames:
@@ -2434,7 +2434,7 @@ def main():
                         width,
                         ratio=0.5,
                         generator=None,
-                        device="cuda",
+                        device="xla",
                         dtype=None,
                     ):
                         noise = torch.randn(

@@ -11,8 +11,10 @@ mixed_precision: 'no'
 num_machines: 1
 num_processes: 8
 rdzv_backend: static
-same_network: true
-tpu_env: []
+same_network: false
+tpu_env:
+  - TPU_HOSTS=35.204.60.81 # External IPs of TPU VMs in different regions
+  - TPU_NAME=tpu-0
 tpu_use_cluster: false
 tpu_use_sudo: false
 use_cpu: false

@@ -264,8 +264,8 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
             clip_image_encoder=clip_image_encoder,
         )
 
-        self.vae = FSDPv2(vae)
-        self.transformer = FSDPv2(transformer)
+        """ self.vae = FSDPv2(vae)
+        self.transformer = FSDPv2(transformer) """
 
         if safety_checker is None and requires_safety_checker:
             logger.warning(
@@ -1082,6 +1082,7 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
         device = self._execution_device
         if initDevice is not None:
             device = initDevice
+        device = torch.device("cpu")
         print("_________________Using Device:", device)
 
         # 3. Encode input prompt
@@ -1508,11 +1509,11 @@ class EasyAnimatePipeline_Multi_Text_Encoder_Inpaint(DiffusionPipeline):
                     latent_model_input.shape[0]
                 ).to(dtype=latent_model_input.dtype)
 
-                xs.mark_sharding(
+                """ xs.mark_sharding(
                     latent_model_input,
                     xs.get_global_mesh(),
                     _prepare_spmd_partition_spec(latent_model_input),
-                )
+                ) """
 
                 # predict the noise residual
                 noise_pred = self.transformer(
