@@ -1,5 +1,10 @@
-from __future__ import annotations
 import os
+
+# SET env HF_HOME
+os.environ["HF_HOME"] = "/dev/shm"
+os.environ["TRANSFORMERS_CACHE"] = "/dev/shm"
+
+from __future__ import annotations
 import base64
 import math
 from io import BytesIO
