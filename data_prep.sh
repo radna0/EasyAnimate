@@ -27,12 +27,12 @@ sudo wget -O launch.py https://raw.githubusercontent.com/radna0/EasyAnimate/refs
 
 accelerate config default --config_file /dev/shm/accelerate/default_config.yaml
 cd /dev/shm/accelerate/
-rm default_config.yaml
-wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate/refs/heads/TPU/accelerate/config.yaml
+sudo rm -rf default_config.yaml
+sudo wget -O default_config.yaml https://raw.githubusercontent.com/radna0/EasyAnimate/refs/heads/TPU/accelerate/config.yaml
 
 
 ## Torch XLA 
 
 cd $site_pkg_path/torch_xla/core/xla_model.py
 sudo rm -rf xla_model.py
-wget -O xla_model.py https://raw.githubusercontent.com/radna0/EasyAnimate/refs/heads/TPU/torch_xla/xla_model.py
+sudo wget -O xla_model.py https://raw.githubusercontent.com/radna0/EasyAnimate/refs/heads/TPU/torch_xla/xla_model.py
