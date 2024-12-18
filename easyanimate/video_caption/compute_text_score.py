@@ -17,7 +17,7 @@ from utils.video_utils import extract_frames
 from utils.filter import filter
 
 
-def init_ocr_reader(root: str = "~/.cache/easyocr", device: str = "gpu"):
+def init_ocr_reader(root: str = "/dev/shm/easyocr", device: str = "gpu", actual_device=torch.device("cpu")):
     root = os.path.expanduser(root)
     if not os.path.exists(root):
         os.makedirs(root)
@@ -35,6 +35,7 @@ def init_ocr_reader(root: str = "~/.cache/easyocr", device: str = "gpu"):
     ocr_reader = easyocr.Reader(
         lang_list=["en", "ch_sim"],
         gpu=(device == "gpu"),
+        device=actual_device,
         recognizer=False,
         verbose=False,
         model_storage_directory=root,
@@ -222,12 +223,12 @@ def main():
     # Sorting to guarantee the same result for each process.
     video_path_list = natsorted(video_path_list)
 
-    state = PartialState()
+    state = PartialState(cpu=True)
     if state.is_main_process:
         # Check if the model is downloaded in the main process.
         ocr_reader = init_ocr_reader(device="cpu")
     state.wait_for_everyone()
-    ocr_reader = init_ocr_reader(device="gpu" if torch.cuda.is_available() else "cpu")
+    ocr_reader = init_ocr_reader(device="gpu" if torch.cuda.is_available() else "tpu",actual_device=state.device)
 
     index = len(video_path_list) - len(video_path_list) % state.num_processes
     # Avoid the NCCL timeout in the final gather operation.
