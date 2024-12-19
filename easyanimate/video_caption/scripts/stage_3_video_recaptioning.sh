@@ -39,9 +39,9 @@ accelerate launch compute_video_quality.py \
     --frame_sample_method uniform \
     --num_sampled_frames 8 \
     --metrics VideoCLIPXLScore \
-    --batch_size 64 \
+    --batch_size 32 \
     --saved_path $VIDEOCLIPXL_SCORE_SAVED_PATH \
-    --saved_freq 640
+    --saved_freq 10
 # measure the duration to process
 export END_TIME=$(date +%s)
 export DURATION=$((END_TIME-START_TIME3))

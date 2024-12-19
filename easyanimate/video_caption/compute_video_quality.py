@@ -133,13 +133,6 @@ def main():
 
     state = PartialState()
     print(f"__________________Device: {state.device}")
-    mem = round(xm.get_memory_info(state.device)["bytes_limit"] / 1e9, 2)
-    print(f"Batch size: {mem} GB for batch size: {args.batch_size}")
-
-    if mem < 10:
-        args.batch_size = 12
-    else:
-        args.batch_size = 32
     print(f"Batch size: {args.batch_size}")
     metric_fns = []
     for metric in args.metrics:
