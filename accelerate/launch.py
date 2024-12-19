@@ -881,7 +881,7 @@ def tpu_launcher(args):
 
     main_function = getattr(mod, args.main_training_function)
     with patch_environment(**current_env):
-        xmp.spawn(PrepareForLaunch(main_function), args=(), nprocs=args.num_processes if args.num_processes != 0 else None)
+        xmp.spawn(PrepareForLaunch(main_function), args=(), nprocs=1 if args.num_processes == 1 else None)
 
 
 def tpu_pod_launcher(args):
